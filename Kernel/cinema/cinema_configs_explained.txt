@@ -19,6 +19,12 @@ CONFIG_USB_TYPEC_ALTMODE=y
   The generic USB-C Alternate Mode framework. Parent of DP alt mode and
   Thunderbolt alt mode. Required for CONFIG_TYPEC_DP_ALTMODE to function.
 
+CONFIG_USB_TYPEC_DISPLAYPORT=y
+  Explicit DisplayPort-over-USB-C driver. Works alongside TYPEC_DP_ALTMODE
+  to handle DP Alt Mode negotiation and pin assignment switching on the
+  USB-C mux. More complete DP bring-up than alt mode framework alone.
+  Required for: reliable 4K DP output on ishtar hardware.
+
 CONFIG_EXTCON=y
   External Connector (extcon) framework. Handles hotplug events for
   USB-C accessories. When you plug in an external monitor or audio interface,
@@ -28,6 +34,25 @@ CONFIG_EXTCON_USB_GPIO=y
   GPIO-based extcon driver. Allows hardware GPIO signals to report USB-C
   connection state. Needed by some USB-C mux/crossswitch ICs on the 13 Ultra
   to signal DP alt mode negotiation completion.
+  NOTE: This was documented but missing from the original workflow — now fixed.
+
+--------------------------------------------------------------------
+HDMI CEC (CONSUMER ELECTRONICS CONTROL)
+--------------------------------------------------------------------
+
+CONFIG_CEC_CORE=y
+  Consumer Electronics Control (CEC) protocol stack.
+  CEC is the sideband control channel present on all HDMI/DP connections.
+  It allows devices to send commands to each other: wake, sleep, volume,
+  active source selection, etc.
+  Without CEC: connecting an Atomos Ninja V via DP→HDMI requires manually
+  powering on the monitor. With CEC: it wakes automatically on connection.
+
+CONFIG_MEDIA_CEC_SUPPORT=y
+  Integrates the CEC core into the V4L2/media subsystem.
+  Required for CEC to work with V4L2-registered display outputs (DP alt mode
+  output is registered as a V4L2 output on Android).
+  Also enables /dev/cec0 device node for userspace CEC control apps.
 
 --------------------------------------------------------------------
 PROFESSIONAL USB AUDIO
@@ -59,6 +84,36 @@ CONFIG_SND_SEQUENCER=y
   (SMPTE LTC sync, MTC sync for multi-camera timecode alignment).
 
 --------------------------------------------------------------------
+ALSA AUDIO PIPELINE — TIMECODE & MONITORING
+--------------------------------------------------------------------
+
+CONFIG_SND_ALOOP=y
+  ALSA virtual loopback device. Creates a software loopback between two
+  ALSA PCM devices without requiring hardware loopback cables.
+  Cinema use cases:
+  - Route LTC (Linear Timecode) from a timecode receiver app to a recording
+    app for frame-accurate sync without an external splitter cable.
+  - Software monitor mixing: mix USB mic input with a playback track for
+    zero-latency IEM monitoring.
+  - Feed timecode into multi-camera sync apps (Timecode Systems, Tentacle Sync).
+  Creates /dev/snd/controlC[N] and PCM nodes for the loopback device.
+
+CONFIG_SND_HRTIMER=y
+  ALSA hrtimer-based clock backend. Replaces the jiffies-based ALSA timer
+  with a high-resolution hrtimer, giving sub-millisecond clock accuracy
+  to ALSA PCM streams regardless of CONFIG_HZ setting.
+  Cinema impact: USB audio interfaces that expose very small buffer sizes
+  (128 or 256 frames at 48kHz = 2.7-5.3ms) will have stable timing without
+  underruns even at HZ=300. This is the real fix for audio latency —
+  more impactful than CONFIG_HZ_1000 for the audio path specifically.
+
+CONFIG_SND_PCM_TIMER=y
+  ALSA PCM timer — exposes ALSA PCM streams as POSIX timer sources.
+  Required by some professional timecode and sync applications that use
+  CLOCK_REALTIME or CLOCK_MONOTONIC synchronised to the audio clock.
+  Also used by apps doing sample-accurate AV sync (frame-accurate start/stop).
+
+--------------------------------------------------------------------
 FAST USB-C EXTERNAL STORAGE
 --------------------------------------------------------------------
 
@@ -83,27 +138,67 @@ CONFIG_USB_UAS=y
   Compatible drives: Samsung T9, SanDisk Pro-G40, WD My Passport SSD.
 
 --------------------------------------------------------------------
-V4L2 MEDIA FRAMEWORK
+CINEMA DRIVE FILESYSTEMS
+--------------------------------------------------------------------
+
+CONFIG_EXFAT_FS=y
+  Microsoft exFAT filesystem with full read/write support.
+  exFAT is the factory format of:
+  - Samsung T9 / T7 Portable SSD
+  - SanDisk Extreme Pro / Pro-G40 SSD
+  - All SDXC cards formatted >32GB (FAT32 limit)
+  - Most cinema SSDs out of the box
+  Without exFAT, the phone cannot mount these drives at all via USB OTG.
+  This kernel module provides native exFAT (not FUSE), meaning full-speed
+  access matching the hardware capability of the UAS driver above.
+  Source: kernel-native exFAT driver merged in Linux 5.7+, present in
+  GKI 5.15 as a selectable module.
+
+CONFIG_NTFS3=y
+  Kernel-native NTFS3 filesystem driver (read + write).
+  NTFS is the default format for Windows-formatted drives common on
+  mixed-platform production sets (Windows editing workstations, rental SSDs).
+  NTFS3 (Paragon's driver, merged in Linux 5.15) provides full read/write
+  at native kernel speed, replacing the old FUSE-based ntfs-3g which caps
+  at ~300 MB/s due to FUSE overhead.
+  With NTFS3 + UAS: Windows-formatted Samsung T9 achieves full ~1800 MB/s.
+
+--------------------------------------------------------------------
+V4L2 MEDIA FRAMEWORK + MEDIA CONTROLLER API
 --------------------------------------------------------------------
 
 CONFIG_MEDIA_SUPPORT=y
   Master switch for the Linux Media subsystem. Required parent config
-  for all V4L2 and DVB drivers.
+  for all V4L2 and CEC drivers.
+
+CONFIG_MEDIA_CONTROLLER=y
+  Media Controller (MC) API. Exposes the full camera pipeline topology
+  as a graph of linked entities: sensor → CSI → ISP → encoder.
+  Required by:
+  - OpenCamera with HAL3 (direct sensor control)
+  - libcamera (advanced ISP pipeline configuration)
+  - Any app that wants per-stage control (exposure, gain, white balance
+    applied at the sensor level rather than through HAL abstraction)
+  Creates /dev/media0 device node. Without MC, only high-level V4L2
+  capture is available, not fine pipeline control.
 
 CONFIG_VIDEO_V4L2=y
   Video4Linux2 core. The universal Linux camera/video API.
   On Android, the camera HAL ultimately sits on top of V4L2 nodes
-  for sensor and ISP access. Enabling this ensures all V4L2 device
-  nodes are available for advanced camera apps and external capture
-  devices. Also required for: USB video capture cards, webcams
-  connected via USB-C hub.
+  for sensor and ISP access. Also required for USB video capture cards
+  and webcams connected via USB-C hub.
 
 CONFIG_VIDEO_V4L2_SUBDEV_API=y
   V4L2 sub-device API. Exposes individual sensor/ISP pipeline stages
-  as separate V4L2 sub-devices. Required for apps that want to directly
-  control sensor exposure, gain, and focus at the kernel level (bypassing
-  HAL abstraction). Used by: advanced camera control apps, custom ISP
-  tuning tools, potential future RAW streaming.
+  as separate V4L2 sub-devices. Required for direct sensor control
+  (bypassing HAL), ISP tuning tools, and potential RAW streaming.
+
+CONFIG_VIDEO_FIXED_MINOR_RANGES=y
+  Allocates fixed minor number ranges to V4L2 device classes.
+  Result: /dev/video0 is always the ISP capture node, /dev/video1 is
+  always the next node, etc. — consistent across reboots.
+  Without this, device node numbers shift on reboot, breaking hardcoded
+  paths in camera control scripts and apps.
 
 CONFIG_VIDEOBUF2_CORE=y
   VB2 core buffer management framework. Handles DMA buffer allocation
@@ -116,30 +211,71 @@ CONFIG_VIDEOBUF2_V4L2=y
 CONFIG_VIDEOBUF2_DMA_CONTIG=y
   VB2 DMA-contiguous memory allocator. Allocates physically contiguous
   DMA buffers for video frames. Critical for zero-copy camera pipelines:
-  sensor -> ISP -> encoder without CPU memcopy. This is what makes
+  sensor → ISP → encoder without CPU memcopy. This is what makes
   high-bitrate 4K recording possible without dropping frames.
+
+CONFIG_VIDEOBUF2_VMALLOC=y
+  VB2 vmalloc memory allocator. Used by V4L2 drivers that don't require
+  physically contiguous memory — primarily USB capture cards and some
+  software devices. Required for: USB HDMI capture dongles, USB webcams
+  connected via hub, and any V4L2 device that uses scatter-gather DMA.
+
+--------------------------------------------------------------------
+DMA-BUF HEAPS + ANDROID SYNC FENCES
+--------------------------------------------------------------------
+
+CONFIG_DMABUF_HEAPS=y
+  DMA-BUF heap allocator framework (Android ION successor).
+  The core infrastructure for allocating shared memory buffers that
+  can be passed zero-copy between camera, ISP, display, and encoder
+  without any CPU involvement. This is the Android 12+ replacement for
+  the legacy ION allocator.
+
+CONFIG_DMABUF_HEAPS_SYSTEM=y
+  System heap — allocates from the general system memory pool.
+  Used for buffers that don't require contiguous physical memory:
+  thumbnail generation, JPEG encoding output, metadata buffers.
+
+CONFIG_DMABUF_HEAPS_CMA=y
+  CMA (Contiguous Memory Allocator) heap. Allocates large physically
+  contiguous regions required for high-resolution, high-bitrate capture.
+  Cinema use case: a single 4K frame at 12-bit RAW = ~25MB contiguous.
+  At 24fps, 600MB/s of contiguous allocations are needed. Without CMA heap,
+  the camera HAL falls back to fragmented allocations causing pipeline stalls
+  and frame drops at high bitrates.
+
+CONFIG_SYNC_FILE=y
+  Android sync fence framework (sw_sync / sync_file).
+  Sync fences are used throughout the Android camera and display pipeline
+  to signal when a buffer is "ready to read" or "ready to write" without
+  CPU polling. Without SYNC_FILE:
+  - Camera HAL cannot do proper acquire/release fence signaling
+  - Display composer may tear frames or present out-of-order
+  - Video encoder input fencing breaks, causing corruption at high bitrates
+  NOTE: likely already enabled in GKI base defconfig — set here as an
+  explicit guarantee for the cinema build.
 
 --------------------------------------------------------------------
 LOW-LATENCY SCHEDULING
 --------------------------------------------------------------------
-
-CONFIG_HZ_1000=y
-  Sets kernel timer interrupt frequency to 1000Hz (1ms resolution).
-  Default GKI is typically 300Hz (3.3ms resolution).
-  At 1000Hz: audio buffers can be as small as 1ms, reducing latency
-  in recording chains. Critical for: sync between audio interface
-  (USB) and video recording. Lower latency = tighter AV sync.
-  Trade-off: slightly higher CPU overhead (~0.5-1%). Acceptable on
-  Snapdragon 8 Gen 2.
 
 CONFIG_HIGH_RES_TIMERS=y
   Enables POSIX high-resolution timers (clock_nanosleep, timer_create
   with CLOCK_MONOTONIC). Required by professional audio apps for
   sub-millisecond timing. FiLMiC Pro and most pro video apps use
   HR timers for frame-accurate recording start/stop.
+  See also: CONFIG_SND_HRTIMER above — together these give hrtimer-backed
+  audio clocks with sub-ms accuracy regardless of CONFIG_HZ.
+
+CONFIG_HZ_1000=y  [OPTIONAL — enabled by enableHZ1000 flag]
+  Sets kernel timer interrupt frequency to 1000Hz (1ms resolution).
+  Default GKI is 300Hz (3.3ms resolution).
+  See Kernel/configs/hz1000.config and docs on enableHZ1000.
+  NOTE: breaks GKI ABI compliance. High-res audio timing is better
+  achieved via CONFIG_SND_HRTIMER above without ABI implications.
 
 --------------------------------------------------------------------
-USB GADGET (UVC / UAC2) — PHONE AS OUTPUT DEVICE
+USB GADGET (UVC / UAC2 / EXTENDED)
 --------------------------------------------------------------------
 
 CONFIG_USB_GADGET=y
@@ -165,31 +301,58 @@ CONFIG_USB_CONFIGFS_F_UAC2=y
   3.5mm input into a laptop DAW (Pro Tools, Logic, Reaper) in real-time.
   Also enables phone-as-audio-interface for external recorders.
 
+CONFIG_USB_CONFIGFS_F_FS=y
+  FunctionFS (FFS) gadget function. Allows userspace applications to
+  implement custom USB gadget protocols. Use case: on-set remote control
+  apps that expose a custom USB serial/HID interface for tethered control
+  of the phone camera from a laptop (start/stop recording, focus pull,
+  exposure adjustment over USB).
+
+CONFIG_USB_CONFIGFS_F_RNDIS=y
+  RNDIS USB Ethernet gadget function. Presents the phone as a USB
+  network adapter to a connected laptop.
+  Cinema use case: wireless monitor over USB — phone streams live video
+  preview to a laptop over a USB-C cable acting as a "tether" network
+  link. Also useful for AV-over-IP tools (NDI, SRT) when shooting
+  tethered to a monitoring station.
+
 --------------------------------------------------------------------
 COMBINED CINEMA USE CASES
 --------------------------------------------------------------------
 
-External monitor output:
-  CONFIG_TYPEC_DP_ALTMODE + CONFIG_USB_TYPEC_ALTMODE + CONFIG_EXTCON
+External monitor output (auto-wake):
+  CONFIG_TYPEC_DP_ALTMODE + CONFIG_USB_TYPEC_DISPLAYPORT + CONFIG_CEC_CORE
   -> USB-C cable to Portkeys BM5 III or SmallHD Focus 5
-  -> Full 4K signal output with HDR metadata
+  -> Full 4K DP 1.4 signal with HDR metadata
+  -> Monitor wakes automatically via CEC on cable connect
 
 Professional audio recording:
-  CONFIG_SND_USB_AUDIO + CONFIG_USB_XHCI_HCD
+  CONFIG_SND_USB_AUDIO + CONFIG_USB_XHCI_HCD + CONFIG_SND_HRTIMER
   -> Rode AI-Micro via USB-C
-  -> 48kHz/24-bit XLR microphone input directly to phone
+  -> 48kHz/24-bit XLR microphone input with sub-ms clock accuracy
 
-Fast footage offload on set:
-  CONFIG_USB_UAS + CONFIG_USB_XHCI_HCD
-  -> Samsung T9 SSD via USB-C
-  -> ~1800 MB/s transfer = 100GB in ~55 seconds
+Fast footage offload on set (Windows or Mac SSDs):
+  CONFIG_USB_UAS + CONFIG_EXFAT_FS + CONFIG_NTFS3
+  -> Samsung T9 (exFAT) or any NTFS drive via USB-C
+  -> ~1800 MB/s: 100GB in ~55 seconds regardless of drive format
 
-Low-latency AV sync:
-  CONFIG_HZ_1000 + CONFIG_HIGH_RES_TIMERS
-  -> Audio latency < 5ms with USB audio interface
-  -> Frame-accurate start/stop with FiLMiC Pro
+Zero-copy 4K pipeline (no dropped frames):
+  CONFIG_DMABUF_HEAPS_CMA + CONFIG_SYNC_FILE + CONFIG_VIDEOBUF2_DMA_CONTIG
+  -> Camera sensor → ISP → H.265 encoder without CPU memcopy
+  -> Sync fences prevent out-of-order frame presentation
+
+Timecode sync (multi-camera):
+  CONFIG_SND_ALOOP + CONFIG_SND_HRTIMER + CONFIG_SND_SEQUENCER
+  -> LTC timecode from Tentacle Sync routed via ALSA loopback
+  -> Frame-accurate sync between multiple 13 Ultra units
+  -> Automatic sync in DaVinci Resolve / Plural Eyes
 
 Phone as studio output:
-  CONFIG_USB_CONFIGFS_F_UVC + CONFIG_USB_CONFIGFS_F_UAC2
-  -> Phone appears as webcam + audio interface to a laptop
-  -> Direct integration into streaming/NLE workflows
+  CONFIG_USB_CONFIGFS_F_UVC + CONFIG_USB_CONFIGFS_F_UAC2 + CONFIG_USB_CONFIGFS_F_RNDIS
+  -> Phone appears as webcam + audio interface + network adapter to laptop
+  -> Direct integration into streaming/NLE workflows over a single USB-C cable
+
+Advanced ISP pipeline control:
+  CONFIG_MEDIA_CONTROLLER + CONFIG_VIDEO_V4L2_SUBDEV_API
+  -> /dev/media0 exposes full sensor→ISP→encoder graph
+  -> OpenCamera HAL3 / libcamera can control per-stage exposure, gain, WB

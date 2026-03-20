@@ -383,42 +383,89 @@ jobs:
           cd ${{ env.KERNEL_NAME }}
 
           # === USB-C EXTERNAL MONITOR / DISPLAYPORT OUTPUT ===
-          # Enables DisplayPort Alt Mode over USB-C for external monitors/recorders
+          # DisplayPort Alt Mode over USB-C for external monitors/recorders
+          # (Atomos Ninja V, SmallHD Focus 5, Portkeys BM5 III, etc.)
           echo "CONFIG_TYPEC_DP_ALTMODE=y" >> "$CONFIG_FILE"
           echo "CONFIG_USB_TYPEC_ALTMODE=y" >> "$CONFIG_FILE"
+          echo "CONFIG_USB_TYPEC_DISPLAYPORT=y" >> "$CONFIG_FILE"
           echo "CONFIG_EXTCON=y" >> "$CONFIG_FILE"
+          echo "CONFIG_EXTCON_USB_GPIO=y" >> "$CONFIG_FILE"
+
+          # === HDMI CEC (Consumer Electronics Control) ===
+          # Allows monitor wake/sleep and remote control over HDMI/DP.
+          # Without CEC, connected field monitors won't auto-wake on connect.
+          echo "CONFIG_CEC_CORE=y" >> "$CONFIG_FILE"
+          echo "CONFIG_MEDIA_CEC_SUPPORT=y" >> "$CONFIG_FILE"
 
           # === PROFESSIONAL USB AUDIO ===
-          # External mics, XLR interfaces (Rode AI-Micro, Zoom AM7, etc.)
+          # External mics, XLR interfaces (Rode AI-Micro, Zoom AM7, MOTU M2, etc.)
           echo "CONFIG_SND_USB_AUDIO=y" >> "$CONFIG_FILE"
           echo "CONFIG_USB_AUDIO=y" >> "$CONFIG_FILE"
           echo "CONFIG_SND_RAWMIDI=y" >> "$CONFIG_FILE"
           echo "CONFIG_SND_SEQUENCER=y" >> "$CONFIG_FILE"
 
+          # === ALSA AUDIO PIPELINE — TIMECODE & MONITORING ===
+          # SND_ALOOP: virtual ALSA loopback for LTC timecode routing between apps
+          # and software monitor mixing without hardware loopback cable.
+          # SND_HRTIMER: hrtimer-based ALSA clock backend — sub-ms audio timing
+          # independent of CONFIG_HZ; critical for tight USB audio sync.
+          # SND_PCM_TIMER: PCM timer required by some timecode/sync apps.
+          echo "CONFIG_SND_ALOOP=y" >> "$CONFIG_FILE"
+          echo "CONFIG_SND_HRTIMER=y" >> "$CONFIG_FILE"
+          echo "CONFIG_SND_PCM_TIMER=y" >> "$CONFIG_FILE"
+
           # === FAST USB-C EXTERNAL STORAGE ===
-          # UAS protocol for fast SSD offload (Samsung T9, etc.)
+          # UAS protocol for fast SSD offload (Samsung T9, SanDisk Pro-G40, etc.)
           echo "CONFIG_USB_XHCI_HCD=y" >> "$CONFIG_FILE"
           echo "CONFIG_USB_STORAGE=y" >> "$CONFIG_FILE"
           echo "CONFIG_USB_UAS=y" >> "$CONFIG_FILE"
 
-          # === V4L2 MEDIA FRAMEWORK ===
-          # Video4Linux2 for camera input pipeline and external capture devices
+          # === CINEMA DRIVE FILESYSTEMS ===
+          # exFAT: factory format for Samsung T9, SanDisk Pro-G40, SDXC cards >32GB.
+          # NTFS3: kernel-native NTFS write support for Windows-formatted drives
+          # common on set. Replaces FUSE-based ntfs-3g for full-speed transfers.
+          echo "CONFIG_EXFAT_FS=y" >> "$CONFIG_FILE"
+          echo "CONFIG_NTFS3=y" >> "$CONFIG_FILE"
+
+          # === V4L2 MEDIA FRAMEWORK + MEDIA CONTROLLER ===
+          # MEDIA_CONTROLLER: MC API exposes pipeline topology (sensor→ISP→encoder)
+          # required by OpenCamera HAL3, libcamera, and advanced capture tools.
+          # VIDEO_FIXED_MINOR_RANGES: deterministic /dev/videoN numbering across reboots.
+          # VIDEOBUF2_VMALLOC: vmalloc allocator for USB capture cards / webcams.
           echo "CONFIG_MEDIA_SUPPORT=y" >> "$CONFIG_FILE"
+          echo "CONFIG_MEDIA_CONTROLLER=y" >> "$CONFIG_FILE"
           echo "CONFIG_VIDEO_V4L2=y" >> "$CONFIG_FILE"
           echo "CONFIG_VIDEO_V4L2_SUBDEV_API=y" >> "$CONFIG_FILE"
+          echo "CONFIG_VIDEO_FIXED_MINOR_RANGES=y" >> "$CONFIG_FILE"
           echo "CONFIG_VIDEOBUF2_CORE=y" >> "$CONFIG_FILE"
           echo "CONFIG_VIDEOBUF2_V4L2=y" >> "$CONFIG_FILE"
           echo "CONFIG_VIDEOBUF2_DMA_CONTIG=y" >> "$CONFIG_FILE"
+          echo "CONFIG_VIDEOBUF2_VMALLOC=y" >> "$CONFIG_FILE"
+
+          # === DMA-BUF HEAPS + ANDROID SYNC FENCES ===
+          # Zero-copy camera → ISP → encoder pipeline. Without DMA-BUF heaps,
+          # frames are CPU-copied between pipeline stages, dropping frames at 4K.
+          # SYNC_FILE: Android sync fence framework for camera frame ordering
+          # and display composition pipeline correctness.
+          echo "CONFIG_DMABUF_HEAPS=y" >> "$CONFIG_FILE"
+          echo "CONFIG_DMABUF_HEAPS_SYSTEM=y" >> "$CONFIG_FILE"
+          echo "CONFIG_DMABUF_HEAPS_CMA=y" >> "$CONFIG_FILE"
+          echo "CONFIG_SYNC_FILE=y" >> "$CONFIG_FILE"
 
           # === LOW-LATENCY SCHEDULING ===
           echo "CONFIG_HIGH_RES_TIMERS=y" >> "$CONFIG_FILE"
 
-          # === USB GADGET (UVC / UAC2) ===
-          # Use phone as USB webcam output or USB audio source
+          # === USB GADGET (UVC / UAC2 / EXTENDED) ===
+          # UVC: phone as USB webcam to laptop/recorder/mixer.
+          # UAC2: phone as USB audio interface (record phone mics into laptop DAW).
+          # F_FS: FunctionFS for custom gadget functions (tethered control apps).
+          # F_RNDIS: USB Ethernet tethering alongside audio/video gadget output.
           echo "CONFIG_USB_GADGET=y" >> "$CONFIG_FILE"
           echo "CONFIG_USB_CONFIGFS=y" >> "$CONFIG_FILE"
           echo "CONFIG_USB_CONFIGFS_F_UVC=y" >> "$CONFIG_FILE"
           echo "CONFIG_USB_CONFIGFS_F_UAC2=y" >> "$CONFIG_FILE"
+          echo "CONFIG_USB_CONFIGFS_F_FS=y" >> "$CONFIG_FILE"
+          echo "CONFIG_USB_CONFIGFS_F_RNDIS=y" >> "$CONFIG_FILE"
 
           echo "✅ Cinema kernel features appended to $CONFIG_FILE"
 
