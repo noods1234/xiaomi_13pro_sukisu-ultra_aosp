@@ -295,9 +295,7 @@ jobs:
           cp -r ../SukiSU_patch/other/zram/lz4k_oplus ./lib/
 
           # Apply common SUSFS patch
-          #sed -i 's/-32,12 +32,38/-32,11 +32,37/g' 50_add_susfs_in_${{ env.SFS_BRANCH }}.patch
-          #sed -i '/#include <trace\/hooks\/fs.h>/d' 50_add_susfs_in_${{ env.SFS_BRANCH }}.patch
-          patch -p1 < 50_add_susfs_in_${{ env.SFS_BRANCH }}.patch || true
+          patch -p1 < 50_add_susfs_in_${{ env.SFS_BRANCH }}.patch
           
           cp ../SukiSU_patch/hooks/syscall_hooks.patch ./
           patch -p1 -F 3 < syscall_hooks.patch
@@ -333,7 +331,6 @@ jobs:
           echo "CONFIG_CRYPTO_LZ4HC=y" >> "$CONFIG_FILE"
           echo "CONFIG_CRYPTO_LZ4K=y" >> "$CONFIG_FILE"
           echo "CONFIG_CRYPTO_LZ4KD=y" >> "$CONFIG_FILE"
-          echo "CONFIG_CRYPTO_842=y" >> "$CONFIG_FILE"
           
           # Enable KPM
           echo "CONFIG_KPM=y" >> "$CONFIG_FILE"
@@ -357,7 +354,6 @@ jobs:
           echo "CONFIG_TYPEC_DP_ALTMODE=y" >> "$CONFIG_FILE"
           echo "CONFIG_USB_TYPEC_ALTMODE=y" >> "$CONFIG_FILE"
           echo "CONFIG_EXTCON=y" >> "$CONFIG_FILE"
-          echo "CONFIG_EXTCON_USB_GPIO=y" >> "$CONFIG_FILE"
 
           # === PROFESSIONAL USB AUDIO ===
           # External mics, XLR interfaces (Rode AI-Micro, Zoom AM7, etc.)
@@ -382,8 +378,6 @@ jobs:
           echo "CONFIG_VIDEOBUF2_DMA_CONTIG=y" >> "$CONFIG_FILE"
 
           # === LOW-LATENCY SCHEDULING ===
-          # 1000Hz timer for tighter audio/video frame timing
-          echo "CONFIG_HZ_1000=y" >> "$CONFIG_FILE"
           echo "CONFIG_HIGH_RES_TIMERS=y" >> "$CONFIG_FILE"
 
           # === USB GADGET (UVC / UAC2) ===

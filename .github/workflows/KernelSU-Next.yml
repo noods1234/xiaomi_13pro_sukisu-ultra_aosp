@@ -281,11 +281,11 @@ jobs:
           # Applying SUSFS patches
           cd ./KernelSU-Next
           cp ../../kernel_patches/next/0001-kernel-patch-susfs-v1.5.7-to-KernelSU-Next-v1.0.7.patch ./
-            patch -p1 --forward --fuzz=3 < 0001-kernel-patch-susfs-v1.5.7-to-KernelSU-Next-v1.0.7.patch || true
-          
+          patch -p1 --forward --fuzz=3 < 0001-kernel-patch-susfs-v1.5.7-to-KernelSU-Next-v1.0.7.patch
+
           # Apply common SUSFS patch
           cd ..
-          patch -p1 < 50_add_susfs_in_${{ env.SFS_BRANCH }}.patch || true
+          patch -p1 < 50_add_susfs_in_${{ env.SFS_BRANCH }}.patch
 
           # Apply New Hooks Patches
           cp ../kernel_patches/next/syscall_hooks.patch ./
@@ -384,7 +384,6 @@ jobs:
           echo "CONFIG_TYPEC_DP_ALTMODE=y" >> "$CONFIG_FILE"
           echo "CONFIG_USB_TYPEC_ALTMODE=y" >> "$CONFIG_FILE"
           echo "CONFIG_EXTCON=y" >> "$CONFIG_FILE"
-          echo "CONFIG_EXTCON_USB_GPIO=y" >> "$CONFIG_FILE"
 
           # === PROFESSIONAL USB AUDIO ===
           # External mics, XLR interfaces (Rode AI-Micro, Zoom AM7, etc.)
@@ -409,8 +408,6 @@ jobs:
           echo "CONFIG_VIDEOBUF2_DMA_CONTIG=y" >> "$CONFIG_FILE"
 
           # === LOW-LATENCY SCHEDULING ===
-          # 1000Hz timer for tighter audio/video frame timing
-          echo "CONFIG_HZ_1000=y" >> "$CONFIG_FILE"
           echo "CONFIG_HIGH_RES_TIMERS=y" >> "$CONFIG_FILE"
 
           # === USB GADGET (UVC / UAC2) ===
