@@ -359,17 +359,66 @@ jobs:
             echo "🎖️ Apply xt_qtaguid.patch"
           fi
 
-      - name: 🧹 Config Kernel Name
-        working-directory: ${{ env.KERNEL_NAME }}
-        env: 
+      - name: 🎬 Setup Cinema Kernel Features
+        env:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
         run: |
-          sed -i '$s|echo "\$res"|echo "\$res-nnn950711"|' ./scripts/setlocalversion
+          CONFIG_FILE=arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}
+          cd ${{ env.KERNEL_NAME }}
+
+          # === USB-C EXTERNAL MONITOR / DISPLAYPORT OUTPUT ===
+          # Enables DisplayPort Alt Mode over USB-C for external monitors/recorders
+          echo "CONFIG_TYPEC_DP_ALTMODE=y" >> "$CONFIG_FILE"
+          echo "CONFIG_USB_TYPEC_ALTMODE=y" >> "$CONFIG_FILE"
+          echo "CONFIG_EXTCON=y" >> "$CONFIG_FILE"
+          echo "CONFIG_EXTCON_USB_GPIO=y" >> "$CONFIG_FILE"
+
+          # === PROFESSIONAL USB AUDIO ===
+          # External mics, XLR interfaces (Rode AI-Micro, Zoom AM7, etc.)
+          echo "CONFIG_SND_USB_AUDIO=y" >> "$CONFIG_FILE"
+          echo "CONFIG_USB_AUDIO=y" >> "$CONFIG_FILE"
+          echo "CONFIG_SND_RAWMIDI=y" >> "$CONFIG_FILE"
+          echo "CONFIG_SND_SEQUENCER=y" >> "$CONFIG_FILE"
+
+          # === FAST USB-C EXTERNAL STORAGE ===
+          # UAS protocol for fast SSD offload (Samsung T9, etc.)
+          echo "CONFIG_USB_XHCI_HCD=y" >> "$CONFIG_FILE"
+          echo "CONFIG_USB_STORAGE=y" >> "$CONFIG_FILE"
+          echo "CONFIG_USB_UAS=y" >> "$CONFIG_FILE"
+
+          # === V4L2 MEDIA FRAMEWORK ===
+          # Video4Linux2 for camera input pipeline and external capture devices
+          echo "CONFIG_MEDIA_SUPPORT=y" >> "$CONFIG_FILE"
+          echo "CONFIG_VIDEO_V4L2=y" >> "$CONFIG_FILE"
+          echo "CONFIG_VIDEO_V4L2_SUBDEV_API=y" >> "$CONFIG_FILE"
+          echo "CONFIG_VIDEOBUF2_CORE=y" >> "$CONFIG_FILE"
+          echo "CONFIG_VIDEOBUF2_V4L2=y" >> "$CONFIG_FILE"
+          echo "CONFIG_VIDEOBUF2_DMA_CONTIG=y" >> "$CONFIG_FILE"
+
+          # === LOW-LATENCY SCHEDULING ===
+          # 1000Hz timer for tighter audio/video frame timing
+          echo "CONFIG_HZ_1000=y" >> "$CONFIG_FILE"
+          echo "CONFIG_HIGH_RES_TIMERS=y" >> "$CONFIG_FILE"
+
+          # === USB GADGET (UVC / UAC2) ===
+          # Use phone as USB webcam output or USB audio source
+          echo "CONFIG_USB_GADGET=y" >> "$CONFIG_FILE"
+          echo "CONFIG_USB_CONFIGFS=y" >> "$CONFIG_FILE"
+          echo "CONFIG_USB_CONFIGFS_F_UVC=y" >> "$CONFIG_FILE"
+          echo "CONFIG_USB_CONFIGFS_F_UAC2=y" >> "$CONFIG_FILE"
+
+          echo "✅ Cinema kernel features appended to $CONFIG_FILE"
+
+      - name: 🧹 Config Kernel Name
+        working-directory: ${{ env.KERNEL_NAME }}
+        env:
+          ARCH: ${{ steps.generate-args.outputs.ARCH }}
+        run: |
+          sed -i '$s|echo "\$res"|echo "\$res-cinema@ishtar"|' ./scripts/setlocalversion
           # Run perl command to modify UTS_VERSION
           perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sat Apr 20 04:20:00 UTC 2024"}' ./scripts/mkcompile_h
           sed -i 's/-dirty//' ./scripts/setlocalversion
           rm -rf ./android/abi_gki_protected_exports_*
-          # sed -E -i '/^CONFIG_LOCALVERSION=/ s/(.*)"$/\1-nnn950711"/' ./arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }} 
 
       - name: 👍 Start building the kernel
         working-directory: ${{ env.KERNEL_NAME }}
@@ -459,7 +508,7 @@ jobs:
         env:
           PARAMS: "${{ toJSON(matrix.CONFIG.AnyKernel3) }}"
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
-          ANYKERNEL3_FILE: "${{ env.WORKSPACE }}/AnyKernel3-${{ env.KERNEL_NAME }}-KernelSU_Next-${{ env.BUILD_DATE }}"
+          ANYKERNEL3_FILE: "${{ env.WORKSPACE }}/AnyKernel3-${{ env.KERNEL_NAME }}-Cinema-KernelSU_Next-${{ env.BUILD_DATE }}"
         run: |
           if echo -n '${{ env.PARAMS }}' | jq -e 'has("custom")' > /dev/null; then
             CUSTOM_ANYKERNEL3=$(echo -n '${{ env.PARAMS }}' | jq -r ".custom")
@@ -498,7 +547,7 @@ jobs:
 
       - name: "💾 Upload AnyKernel3 image => (${{ env.BUILD_DATE }})"
         env:
-          ANYKERNEL3_FILE: "AnyKernel3-${{ env.KERNEL_NAME }}-KernelSU_Next-${{ env.BUILD_DATE }}"
+          ANYKERNEL3_FILE: "AnyKernel3-${{ env.KERNEL_NAME }}-Cinema-KernelSU_Next-${{ env.BUILD_DATE }}"
         uses: actions/upload-artifact@v4
         if: ${{ env.USE_ANYKERNEL3 == 'true' }}
         with:
@@ -507,32 +556,49 @@ jobs:
 
       - name: 🧧 Create GitHub Release => (${{ env.BUILD_DATE }})
         env:
-          ANYKERNEL3_FILE: "${{ env.WORKSPACE }}/AnyKernel3-${{ env.KERNEL_NAME }}-KernelSU_Next-${{ env.BUILD_DATE }}"
-          RELEASE_NAME: "Xiaomi 13 Pro (Nuwa) - GKI / KernelSU Next / KPM / SUSFS"
+          ANYKERNEL3_FILE: "${{ env.WORKSPACE }}/AnyKernel3-${{ env.KERNEL_NAME }}-Cinema-KernelSU_Next-${{ env.BUILD_DATE }}"
+          RELEASE_NAME: "Xiaomi 13 Ultra (Ishtar) - Cinema / KernelSU Next / KPM / SUSFS"
           RELEASE_NOTES: |
-            This release contains KernelSU Next and SUSFS
-                    
-            Features:
-            -> KernelSU Next
-            -> SUSFS ඞ
+            Cinema kernel build for Xiaomi 13 Ultra (ishtar) — SM8550 / GKI 5.15
+
+            === CINEMA FEATURES ===
+            -> DisplayPort Alt Mode (USB-C external monitor/recorder output)
+            -> USB Audio Class 2.0 (XLR interfaces, external mics, mixers)
+            -> USB UAS fast storage (USB-C SSD offload at full speed)
+            -> V4L2 media framework (camera pipeline, external capture)
+            -> 1000Hz timer (low-latency audio/video frame scheduling)
+            -> USB UVC gadget (phone as USB camera output)
+            -> USB UAC2 gadget (phone as USB audio source)
+
+            === ROOT / SECURITY ===
+            -> KernelSU Next (kernel-mode root)
+            -> SUSFS (root hiding — Magic Mount, SUS Path, SUS Mount)
             -> Manual Hooks for Better Hiding
-            -> Wireguard Support
-            -> Simple Maphide for LineageOS Detections
-            -> Futile Maphide for jit-zygote-cache Detections
+            -> KPM (Kernel Patch Manager) for custom patches
+            -> Wireguard VPN support
             -> Magic Mount Support
-            
-            Notes:
-            -> SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
-            -> Kernel Flasher is broken with latest susfs, try https://github.com/libxzr/HorizonKernelFlasher!
-            
-            Module: 
-            -> https://github.com/sidex15/ksu_module_susfs
+
+            === RECOMMENDED CINEMA APPS ===
+            -> FiLMiC Pro (LogV3 10-bit, manual controls)
+            -> ProCam X (14-bit RAW DNG, manual)
+            -> MCPro+ (multi-cam cinema)
+            -> Open Camera (free, full Camera2 API)
+
+            === NOTES ===
+            -> SUS SU Mode 2 disabled — non-kprobe hooks, not needed
+            -> Use HorizonKernelFlasher: https://github.com/libxzr/HorizonKernelFlasher
+            -> Kernel Flasher (old) is broken with latest SUSFS
+
+            === REQUIRED MODULES ===
+            -> SUSFS module: https://github.com/sidex15/ksu_module_susfs
+            -> ZygiskNext: https://github.com/Dr-TSNG/ZygiskNext
+            -> PlayIntegrityFix: https://github.com/chiteroman/PlayIntegrityFix
             
         continue-on-error: true
         uses: softprops/action-gh-release@v1
         if: ${{ env.USE_ANYKERNEL3 == 'true' && env.CONFIRM_RELEASE == 'true' }}
         with:
-          tag_name: Nuwa-KernelSU_Next-v${{ env.BUILD_DATE }}.${{ github.run_number }}
+          tag_name: Ishtar-Cinema-KernelSU_Next-v${{ env.BUILD_DATE }}.${{ github.run_number }}
           files: "${{ env.ANYKERNEL3_FILE }}.zip"
           generate_release_notes: true
           name: ${{ env.RELEASE_NAME }}  # Pass the RELEASE_NAME to the action

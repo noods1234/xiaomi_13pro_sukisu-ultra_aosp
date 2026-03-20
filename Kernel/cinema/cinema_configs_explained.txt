@@ -1,0 +1,195 @@
+Xiaomi 13 Ultra (Ishtar) — Cinema Kernel Config Reference
+==========================================================
+All CONFIG_* flags added by the "Setup Cinema Kernel Features" workflow step,
+with explanations of what each enables for filmmaking.
+
+--------------------------------------------------------------------
+USB-C EXTERNAL MONITOR / DISPLAYPORT OUTPUT
+--------------------------------------------------------------------
+
+CONFIG_TYPEC_DP_ALTMODE=y
+  Enables DisplayPort Alternate Mode over USB-C.
+  The Xiaomi 13 Ultra USB-C port supports USB 3.2 Gen 2 + DP 1.4 alt mode.
+  With this enabled, connecting a USB-C to HDMI 2.0 or USB-C to DP cable
+  allows mirroring or extending the display to an external monitor or
+  field recorder (Atomos Ninja V, SmallHD, Portkeys BM5 III, etc.).
+  Required for: External monitor output during filming.
+
+CONFIG_USB_TYPEC_ALTMODE=y
+  The generic USB-C Alternate Mode framework. Parent of DP alt mode and
+  Thunderbolt alt mode. Required for CONFIG_TYPEC_DP_ALTMODE to function.
+
+CONFIG_EXTCON=y
+  External Connector (extcon) framework. Handles hotplug events for
+  USB-C accessories. When you plug in an external monitor or audio interface,
+  extcon notifies the kernel so the correct alt mode or driver activates.
+
+CONFIG_EXTCON_USB_GPIO=y
+  GPIO-based extcon driver. Allows hardware GPIO signals to report USB-C
+  connection state. Needed by some USB-C mux/crossswitch ICs on the 13 Ultra
+  to signal DP alt mode negotiation completion.
+
+--------------------------------------------------------------------
+PROFESSIONAL USB AUDIO
+--------------------------------------------------------------------
+
+CONFIG_SND_USB_AUDIO=y
+  USB Audio Class (UAC) driver — the most important audio config.
+  Enables any USB-C audio interface to work at class-compliant level:
+  - Rode AI-Micro (2x XLR/TRS, 48V phantom power)
+  - Zoom AM7 (ambisonic mic, USB-C)
+  - MOTU M2/M4 (studio interface via USB hub + USB-C)
+  - IK Multimedia AXE I/O (guitar/vocal)
+  Without this, USB audio devices show as "unrecognized" or fail to route
+  through ALSA/AudioFlinger.
+
+CONFIG_USB_AUDIO=y
+  USB Audio Gadget driver (reverse direction from SND_USB_AUDIO).
+  Allows the phone itself to APPEAR as a USB audio device to a computer or
+  mixer. Useful for: direct phone-to-DAW recording, or using phone mics
+  as inputs to external recorders via USB-C.
+
+CONFIG_SND_RAWMIDI=y
+  Raw MIDI kernel driver. Needed by audio interfaces that expose MIDI
+  ports (most USB audio interfaces do). Without this, MIDI-capable
+  devices may not initialize fully even if audio works.
+
+CONFIG_SND_SEQUENCER=y
+  ALSA MIDI sequencer. Required for apps that use MIDI sync/timecode
+  (SMPTE LTC sync, MTC sync for multi-camera timecode alignment).
+
+--------------------------------------------------------------------
+FAST USB-C EXTERNAL STORAGE
+--------------------------------------------------------------------
+
+CONFIG_USB_XHCI_HCD=y
+  USB 3.x eXtensible Host Controller Interface (xHCI) driver.
+  Required for USB 3.0/3.1/3.2 speeds over USB-C OTG.
+  Without xHCI, USB storage falls back to USB 2.0 (480 Mbps max).
+  With xHCI: USB 3.2 Gen 2 = up to 10 Gbps (practical ~1200 MB/s).
+
+CONFIG_USB_STORAGE=y
+  Base USB mass storage driver (BOT — Bulk-Only Transport).
+  Required as a fallback for USB 2.0 drives and as a dependency
+  for the UAS driver below.
+
+CONFIG_USB_UAS=y
+  USB Attached SCSI (UAS) protocol driver.
+  UAS is the modern replacement for USB mass storage BOT.
+  Benchmarks: Samsung T9 SSD achieves ~1800-2000 MB/s with UAS
+  vs ~400 MB/s with legacy BOT on the same hardware.
+  Critical for: offloading 4K RAW/high-bitrate footage to SSD
+  fast enough to keep up with recording rates.
+  Compatible drives: Samsung T9, SanDisk Pro-G40, WD My Passport SSD.
+
+--------------------------------------------------------------------
+V4L2 MEDIA FRAMEWORK
+--------------------------------------------------------------------
+
+CONFIG_MEDIA_SUPPORT=y
+  Master switch for the Linux Media subsystem. Required parent config
+  for all V4L2 and DVB drivers.
+
+CONFIG_VIDEO_V4L2=y
+  Video4Linux2 core. The universal Linux camera/video API.
+  On Android, the camera HAL ultimately sits on top of V4L2 nodes
+  for sensor and ISP access. Enabling this ensures all V4L2 device
+  nodes are available for advanced camera apps and external capture
+  devices. Also required for: USB video capture cards, webcams
+  connected via USB-C hub.
+
+CONFIG_VIDEO_V4L2_SUBDEV_API=y
+  V4L2 sub-device API. Exposes individual sensor/ISP pipeline stages
+  as separate V4L2 sub-devices. Required for apps that want to directly
+  control sensor exposure, gain, and focus at the kernel level (bypassing
+  HAL abstraction). Used by: advanced camera control apps, custom ISP
+  tuning tools, potential future RAW streaming.
+
+CONFIG_VIDEOBUF2_CORE=y
+  VB2 core buffer management framework. Handles DMA buffer allocation
+  and queueing for video capture pipelines. Required by V4L2.
+
+CONFIG_VIDEOBUF2_V4L2=y
+  VB2-V4L2 glue layer. Connects the VB2 buffer manager to V4L2
+  device nodes.
+
+CONFIG_VIDEOBUF2_DMA_CONTIG=y
+  VB2 DMA-contiguous memory allocator. Allocates physically contiguous
+  DMA buffers for video frames. Critical for zero-copy camera pipelines:
+  sensor -> ISP -> encoder without CPU memcopy. This is what makes
+  high-bitrate 4K recording possible without dropping frames.
+
+--------------------------------------------------------------------
+LOW-LATENCY SCHEDULING
+--------------------------------------------------------------------
+
+CONFIG_HZ_1000=y
+  Sets kernel timer interrupt frequency to 1000Hz (1ms resolution).
+  Default GKI is typically 300Hz (3.3ms resolution).
+  At 1000Hz: audio buffers can be as small as 1ms, reducing latency
+  in recording chains. Critical for: sync between audio interface
+  (USB) and video recording. Lower latency = tighter AV sync.
+  Trade-off: slightly higher CPU overhead (~0.5-1%). Acceptable on
+  Snapdragon 8 Gen 2.
+
+CONFIG_HIGH_RES_TIMERS=y
+  Enables POSIX high-resolution timers (clock_nanosleep, timer_create
+  with CLOCK_MONOTONIC). Required by professional audio apps for
+  sub-millisecond timing. FiLMiC Pro and most pro video apps use
+  HR timers for frame-accurate recording start/stop.
+
+--------------------------------------------------------------------
+USB GADGET (UVC / UAC2) — PHONE AS OUTPUT DEVICE
+--------------------------------------------------------------------
+
+CONFIG_USB_GADGET=y
+  USB Gadget framework — allows the phone to act as a USB device
+  (peripheral) rather than a host. Parent of UVC and UAC2 gadgets.
+
+CONFIG_USB_CONFIGFS=y
+  ConfigFS-based gadget configuration. Modern way to configure USB
+  gadget functions dynamically without recompiling. Required for
+  UVC and UAC2 gadgets to be configured at runtime.
+
+CONFIG_USB_CONFIGFS_F_UVC=y
+  USB Video Class (UVC) gadget function.
+  With this, the phone can present itself as a USB webcam to a laptop,
+  external recorder, or mixing board. Use case: output clean HDMI-
+  equivalent video feed to a Ninja V or Shogun over USB-C cable.
+  Apps like DroidCam or UVC gadget control apps activate this.
+
+CONFIG_USB_CONFIGFS_F_UAC2=y
+  USB Audio Class 2.0 (UAC2) gadget function.
+  Phone appears as a professional USB audio interface to any connected
+  host. Use case: record clean audio from phone's microphones or
+  3.5mm input into a laptop DAW (Pro Tools, Logic, Reaper) in real-time.
+  Also enables phone-as-audio-interface for external recorders.
+
+--------------------------------------------------------------------
+COMBINED CINEMA USE CASES
+--------------------------------------------------------------------
+
+External monitor output:
+  CONFIG_TYPEC_DP_ALTMODE + CONFIG_USB_TYPEC_ALTMODE + CONFIG_EXTCON
+  -> USB-C cable to Portkeys BM5 III or SmallHD Focus 5
+  -> Full 4K signal output with HDR metadata
+
+Professional audio recording:
+  CONFIG_SND_USB_AUDIO + CONFIG_USB_XHCI_HCD
+  -> Rode AI-Micro via USB-C
+  -> 48kHz/24-bit XLR microphone input directly to phone
+
+Fast footage offload on set:
+  CONFIG_USB_UAS + CONFIG_USB_XHCI_HCD
+  -> Samsung T9 SSD via USB-C
+  -> ~1800 MB/s transfer = 100GB in ~55 seconds
+
+Low-latency AV sync:
+  CONFIG_HZ_1000 + CONFIG_HIGH_RES_TIMERS
+  -> Audio latency < 5ms with USB audio interface
+  -> Frame-accurate start/stop with FiLMiC Pro
+
+Phone as studio output:
+  CONFIG_USB_CONFIGFS_F_UVC + CONFIG_USB_CONFIGFS_F_UAC2
+  -> Phone appears as webcam + audio interface to a laptop
+  -> Direct integration into streaming/NLE workflows
