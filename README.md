@@ -184,7 +184,7 @@ Install via SukiSU Ultra Manager after flashing this kernel:
 
 | Component | Details |
 |-----------|---------|
-| Kernel source | crdroidandroid/android_kernel_xiaomi_sm8550 (branch 15.0) |
+| Kernel source | MiCode/Xiaomi_Kernel_OpenSource (branch ishtar-t-oss) |
 | Kernel version | 5.15.x GKI |
 | Architecture | ARM64 |
 | Compiler | LLVM Clang r536225, ThinLTO |
@@ -216,5 +216,5 @@ Artifacts tagged: `Ishtar-Cinema-SukiSU_Ultra-v{DATE}.{RUN}` / `Ishtar-Cinema-Ke
 - **SUSFS Module**: [sidex15](https://github.com/sidex15)
 - **SukiSU patch**: [ShirkNeko](https://github.com/ShirkNeko/SukiSU_patch)
 - **AnyKernel3**: [WildPlusKernel](https://github.com/WildPlusKernel/AnyKernel3)
-- **crdroid SM8550 kernel**: [crdroidandroid](https://github.com/crdroidandroid/android_kernel_xiaomi_sm8550)
+- **Xiaomi kernel source (ishtar-t-oss)**: [MiCode](https://github.com/MiCode/Xiaomi_Kernel_OpenSource/tree/ishtar-t-oss)
 - **HorizonKernelFlasher**: [libxzr](https://github.com/libxzr/HorizonKernelFlasher)

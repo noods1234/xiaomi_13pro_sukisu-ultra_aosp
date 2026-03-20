@@ -1,9 +1,9 @@
 [
     {
         "kernelSource": {
-            "name": "ishtar-cinema-kernel_xiaomi_sm8550",
-            "repo": "https://github.com/crdroidandroid/android_kernel_xiaomi_sm8550.git",
-            "branch": "15.0",
+            "name": "ishtar-cinema-kernel_micode",
+            "repo": "https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git",
+            "branch": "ishtar-t-oss",
             "device": "gki",
             "defconfig": "gki_defconfig"
         },

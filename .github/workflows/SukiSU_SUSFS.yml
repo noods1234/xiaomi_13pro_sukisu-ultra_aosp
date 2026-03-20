@@ -134,6 +134,19 @@ jobs:
           git clone --recursive --depth=1 -j $(nproc) --branch ${{ env.KERNEL_BRANCH }} ${{ env.KERNEL_REPO }} ${{ env.KERNEL_NAME }}
           # tree ${{ env.KERNEL_NAME }}
 
+      - name: 📱 Apply ishtar vendor config fragment
+        run: |
+          cd ${{ env.KERNEL_NAME }}
+          VENDOR_FRAGMENT="arch/arm64/configs/vendor/ishtar_GKI.config"
+          if [ -f "$VENDOR_FRAGMENT" ]; then
+            echo "✅ Found ishtar_GKI.config — merging into gki_defconfig"
+            scripts/kconfig/merge_config.sh -m arch/arm64/configs/gki_defconfig "$VENDOR_FRAGMENT"
+            cp .config arch/arm64/configs/gki_defconfig
+            echo "✅ ishtar vendor fragment merged"
+          else
+            echo "⚠️  ishtar_GKI.config not found — using base gki_defconfig only"
+          fi
+
       - name: 💫 Get toolchains
         env:
           toolchains: "${{ toJSON(matrix.CONFIG.toolchains) }}"
