@@ -73,6 +73,9 @@ jobs:
       # Whether to enable LXC docker
       ENABLE_LXC: ${{ matrix.CONFIG.enableLXC }}
 
+      # Whether to override GKI-locked HZ=300 with HZ=1000 (experimental, breaks GKI ABI)
+      ENABLE_HZ_1000: ${{ matrix.CONFIG.enableHZ1000 }}
+
       # Set output & ccache directory
       OUT_DIR: "${{ github.workspace }}/out"
       CCACHE_DIR: "${{ github.workspace }}/ccache"
@@ -335,11 +338,6 @@ jobs:
           # Enable KPM
           echo "CONFIG_KPM=y" >> "$CONFIG_FILE"
           
-          #Remove check_defconfig
-          #sudo sed -i 's/check_defconfig//' build.config.gki
-          #cd ../
-          #git add -A && git commit -a -m "BUILD Kernel"
-
           cat arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}
           
       - name: 🎬 Setup Cinema Kernel Features
@@ -388,6 +386,33 @@ jobs:
           echo "CONFIG_USB_CONFIGFS_F_UAC2=y" >> "$CONFIG_FILE"
 
           echo "✅ Cinema kernel features appended to $CONFIG_FILE"
+
+      - name: ⏱️ Enable HZ_1000 (experimental)
+        if: ${{ env.ENABLE_HZ_1000 == 'true' }}
+        env:
+          ARCH: ${{ steps.generate-args.outputs.ARCH }}
+        run: |
+          CONFIG_FILE=arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}
+          cd ${{ env.KERNEL_NAME }}
+
+          # CONFIG_HZ is a Kconfig choice — replace existing selection in-place,
+          # or append if gki_defconfig doesn't set it explicitly.
+          if grep -q 'CONFIG_HZ_300=y' "$CONFIG_FILE"; then
+            sed -i 's/CONFIG_HZ_300=y/CONFIG_HZ_1000=y/' "$CONFIG_FILE"
+            echo "✅ Replaced CONFIG_HZ_300 → CONFIG_HZ_1000"
+          else
+            echo "CONFIG_HZ_1000=y" >> "$CONFIG_FILE"
+            echo "✅ Appended CONFIG_HZ_1000 (HZ_300 was not explicitly set)"
+          fi
+
+          # GKI ABI enforcement will reject a non-300 HZ value in check_defconfig.
+          # Bypass it so the build proceeds. This produces a non-GKI-compliant image.
+          if [ -f "build.config.gki" ]; then
+            sed -i 's/check_defconfig//' build.config.gki
+            echo "✅ check_defconfig bypass applied to build.config.gki"
+          fi
+
+          echo "⚠️  HZ_1000 active — kernel is NOT GKI ABI compliant"
 
       - name: 😋 Add Custom Kernel Name
         env:

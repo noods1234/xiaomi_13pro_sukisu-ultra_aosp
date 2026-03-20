@@ -44,6 +44,7 @@
             }
         },
         "enableLXC": false,
+        "enableHZ1000": false,
         "enableKernelSU": true,
         "KernelSUSFS": {
             "enable": true,
