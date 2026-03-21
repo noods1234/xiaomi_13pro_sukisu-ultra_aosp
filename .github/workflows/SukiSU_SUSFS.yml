@@ -348,13 +348,17 @@ jobs:
           cd ${{ env.KERNEL_NAME }}
 
           # === USB-C EXTERNAL MONITOR / DISPLAYPORT OUTPUT ===
-          # DisplayPort Alt Mode over USB-C for external monitors/recorders
-          # (Atomos Ninja V, SmallHD Focus 5, Portkeys BM5 III, etc.)
-          echo "CONFIG_TYPEC_DP_ALTMODE=y" >> "$CONFIG_FILE"
-          echo "CONFIG_USB_TYPEC_ALTMODE=y" >> "$CONFIG_FILE"
-          echo "CONFIG_USB_TYPEC_DISPLAYPORT=y" >> "$CONFIG_FILE"
-          echo "CONFIG_EXTCON=y" >> "$CONFIG_FILE"
-          echo "CONFIG_EXTCON_USB_GPIO=y" >> "$CONFIG_FILE"
+          # On SM8550 the DP stack is entirely vendor-side:
+          #   QTI_PMIC_GLINK + QTI_ALTMODE_GLINK + UCSI_QTI_GLINK
+          # These are already present in ishtar_GKI.config (applied in the vendor
+          # fragment step above). The upstream generic drivers (TYPEC_DP_ALTMODE,
+          # EXTCON_USB_GPIO) are wrong for this SoC — the aDSP firmware owns
+          # USB-C PD negotiation over PMIC GLINK, not the kernel TCPM path.
+          #
+          # MI_ENABLE_DP=y is Xiaomi's own gate flag in the MSM display driver.
+          # It is set in ishtar_GKI.config, but we echo it here as an explicit
+          # safety net in case the vendor fragment step did not apply cleanly.
+          echo "CONFIG_MI_ENABLE_DP=y" >> "$CONFIG_FILE"
 
           # === HDMI CEC (Consumer Electronics Control) ===
           # Allows monitor wake/sleep and remote control over HDMI/DP.
@@ -370,11 +374,13 @@ jobs:
           echo "CONFIG_SND_SEQUENCER=y" >> "$CONFIG_FILE"
 
           # === ALSA AUDIO PIPELINE — TIMECODE & MONITORING ===
-          # SND_ALOOP: virtual ALSA loopback for LTC timecode routing between apps
-          # and software monitor mixing without hardware loopback cable.
-          # SND_HRTIMER: hrtimer-based ALSA clock backend — sub-ms audio timing
-          # independent of CONFIG_HZ; critical for tight USB audio sync.
-          # SND_PCM_TIMER: PCM timer required by some timecode/sync apps.
+          # SND_ALOOP: virtual ALSA loopback (creates /dev/snd/pcmCXDX nodes).
+          # NOTE: Android apps cannot open /dev/snd/ directly — SELinux and
+          # AudioFlinger block it. SND_ALOOP is only usable via a custom Audio HAL
+          # module registered in audio_policy_configuration.xml, or via root-level
+          # tinyalsa tools. Kernel flag is kept as a prerequisite for future HAL work.
+          # SND_HRTIMER: hrtimer-based ALSA clock — sub-ms timing independent of HZ.
+          # SND_PCM_TIMER: PCM timer for sample-accurate AV sync apps.
           echo "CONFIG_SND_ALOOP=y" >> "$CONFIG_FILE"
           echo "CONFIG_SND_HRTIMER=y" >> "$CONFIG_FILE"
           echo "CONFIG_SND_PCM_TIMER=y" >> "$CONFIG_FILE"
@@ -421,8 +427,18 @@ jobs:
           echo "CONFIG_HIGH_RES_TIMERS=y" >> "$CONFIG_FILE"
 
           # === USB GADGET (UVC / UAC2 / EXTENDED) ===
-          # UVC: phone as USB webcam to laptop/recorder/mixer.
-          # UAC2: phone as USB audio interface (record phone mics into laptop DAW).
+          # These are KERNEL PREREQUISITES only. Full functionality requires:
+          #
+          # UVC (phone as USB webcam): needs the Android 14 DeviceAsWebcam system
+          # app (com.android.deviceaswebcam) built into the ROM + ro.usb.uvc.enabled=true
+          # + Qualcomm init.rc DeviceAsWebcam patch (LineageOS Gerrit #395890).
+          # On SM8550, usbd (sys.usb.configfs=2) owns the gadget HAL — a KSU
+          # module cannot directly write configfs while usbd is running.
+          #
+          # UAC2 (phone as USB audio interface): requires a userspace bridge daemon
+          # (tinyalsa-based) and registration in audio_policy_configuration.xml.
+          # The UAC2 ALSA card alone is not routable via Android AudioFlinger.
+          #
           # F_FS: FunctionFS for custom gadget functions (tethered control apps).
           # F_RNDIS: USB Ethernet tethering alongside audio/video gadget output.
           echo "CONFIG_USB_GADGET=y" >> "$CONFIG_FILE"

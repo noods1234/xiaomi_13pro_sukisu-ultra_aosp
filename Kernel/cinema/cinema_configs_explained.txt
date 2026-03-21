@@ -7,34 +7,45 @@ with explanations of what each enables for filmmaking.
 USB-C EXTERNAL MONITOR / DISPLAYPORT OUTPUT
 --------------------------------------------------------------------
 
-CONFIG_TYPEC_DP_ALTMODE=y
-  Enables DisplayPort Alternate Mode over USB-C.
-  The Xiaomi 13 Ultra USB-C port supports USB 3.2 Gen 2 + DP 1.4 alt mode.
-  With this enabled, connecting a USB-C to HDMI 2.0 or USB-C to DP cable
-  allows mirroring or extending the display to an external monitor or
-  field recorder (Atomos Ninja V, SmallHD, Portkeys BM5 III, etc.).
-  Required for: External monitor output during filming.
+HOW DP ACTUALLY WORKS ON SM8550 / ISHTAR
+  On Snapdragon 8 Gen 2, USB-C DisplayPort alt mode is NOT handled by the
+  generic upstream Linux TCPM stack. The entire USB-C PD negotiation runs
+  on the aDSP firmware; the kernel only receives the results via PMIC GLINK.
 
-CONFIG_USB_TYPEC_ALTMODE=y
-  The generic USB-C Alternate Mode framework. Parent of DP alt mode and
-  Thunderbolt alt mode. Required for CONFIG_TYPEC_DP_ALTMODE to function.
+  The real DP driver chain (all in ishtar_GKI.config, applied by the
+  vendor fragment step):
 
-CONFIG_USB_TYPEC_DISPLAYPORT=y
-  Explicit DisplayPort-over-USB-C driver. Works alongside TYPEC_DP_ALTMODE
-  to handle DP Alt Mode negotiation and pin assignment switching on the
-  USB-C mux. More complete DP bring-up than alt mode framework alone.
-  Required for: reliable 4K DP output on ishtar hardware.
+    CONFIG_QTI_PMIC_GLINK=m
+      Qualcomm PMIC GLINK IPC transport — talks to aDSP/firmware over rpmsg.
+      All USB-C role switching and alt mode notifications arrive here first.
 
-CONFIG_EXTCON=y
-  External Connector (extcon) framework. Handles hotplug events for
-  USB-C accessories. When you plug in an external monitor or audio interface,
-  extcon notifies the kernel so the correct alt mode or driver activates.
+    CONFIG_QTI_ALTMODE_GLINK=m
+      "Type-C alternate mode over GLINK." Receives DisplayPort pin assignment
+      and HPD (hot-plug detect) notifications from the aDSP firmware via
+      PMIC GLINK and distributes them to kernel display clients.
+      This is the SM8550 equivalent of CONFIG_TYPEC_DP_ALTMODE — but it is a
+      completely different code path tied to Qualcomm's proprietary firmware.
 
-CONFIG_EXTCON_USB_GPIO=y
-  GPIO-based extcon driver. Allows hardware GPIO signals to report USB-C
-  connection state. Needed by some USB-C mux/crossswitch ICs on the 13 Ultra
-  to signal DP alt mode negotiation completion.
-  NOTE: This was documented but missing from the original workflow — now fixed.
+    CONFIG_UCSI_QTI_GLINK=m
+      Qualcomm UCSI over PMIC GLINK. Handles USB-C power delivery and role
+      management (host/device/DFP) via the aDSP firmware interface.
+
+    CONFIG_DRM_MSM_DP (auto-enabled when DRM_MSM is built, default=y)
+      The MSM DRM DisplayPort display controller driver. Receives HPD events
+      from QTI_ALTMODE_GLINK and drives the DP link training and output.
+
+CONFIG_MI_ENABLE_DP=y
+  Xiaomi's own gate flag inside the MSM display driver source.
+  When disabled, the DP display controller is compiled out even if all other
+  configs are present. ishtar_GKI.config sets this =y; we also set it here
+  explicitly as a safety net in case the vendor fragment was not applied.
+  WITHOUT THIS FLAG: no DP output, regardless of other configs.
+
+CONFIGS THAT ARE WRONG FOR SM8550 (not added to this build):
+  CONFIG_TYPEC_DP_ALTMODE  — upstream TCPM-based DP; bypassed by QTI GLINK
+  CONFIG_USB_TYPEC_ALTMODE — already part of CONFIG_TYPEC=y in gki_defconfig
+  CONFIG_EXTCON_USB_GPIO   — GPIO ID-pin extcon for PM8941-era hardware; not
+                             applicable to SM8550 which uses PMIC GLINK
 
 --------------------------------------------------------------------
 HDMI CEC (CONSUMER ELECTRONICS CONTROL)
@@ -88,15 +99,21 @@ ALSA AUDIO PIPELINE — TIMECODE & MONITORING
 --------------------------------------------------------------------
 
 CONFIG_SND_ALOOP=y
-  ALSA virtual loopback device. Creates a software loopback between two
-  ALSA PCM devices without requiring hardware loopback cables.
-  Cinema use cases:
-  - Route LTC (Linear Timecode) from a timecode receiver app to a recording
-    app for frame-accurate sync without an external splitter cable.
-  - Software monitor mixing: mix USB mic input with a playback track for
-    zero-latency IEM monitoring.
+  ALSA virtual loopback device. Creates /dev/snd/pcmCXDX loopback nodes.
+  Cinema use cases (conceptual):
+  - Route LTC (Linear Timecode) between apps for frame-accurate sync.
+  - Software monitor mixing: mix USB mic input with playback for IEM monitoring.
   - Feed timecode into multi-camera sync apps (Timecode Systems, Tentacle Sync).
-  Creates /dev/snd/controlC[N] and PCM nodes for the loopback device.
+
+  ANDROID LIMITATION: Standard Android apps CANNOT directly access /dev/snd/
+  nodes. SELinux denies the open() call and AudioFlinger does not expose ALSA
+  nodes to app processes. SND_ALOOP is only usable via:
+    1. A custom Audio HAL module registered in audio_policy_configuration.xml
+       (requires ROM rebuild — not possible from kernel alone)
+    2. Root-level tinyalsa tools (aplay/arecord) run as a privileged service
+       via KSU/Magisk exec — niche, but technically works with root access.
+  This config is kept as a kernel prerequisite; it builds the module correctly
+  and makes the loopback device available if/when a HAL or root tool uses it.
 
 CONFIG_SND_HRTIMER=y
   ALSA hrtimer-based clock backend. Replaces the jiffies-based ALSA timer
@@ -288,14 +305,27 @@ CONFIG_USB_CONFIGFS=y
   UVC and UAC2 gadgets to be configured at runtime.
 
 CONFIG_USB_CONFIGFS_F_UVC=y
-  USB Video Class (UVC) gadget function.
-  With this, the phone can present itself as a USB webcam to a laptop,
-  external recorder, or mixing board. Use case: output clean HDMI-
-  equivalent video feed to a Ninja V or Shogun over USB-C cable.
-  Apps like DroidCam or UVC gadget control apps activate this.
+  USB Video Class (UVC) gadget function — KERNEL PREREQUISITE ONLY.
+  This flag enables the kernel UVC gadget module, but full functionality
+  requires additional ROM-level components:
+    1. com.android.deviceaswebcam system app (Android 14, must be in ROM)
+    2. ro.usb.uvc.enabled=true in device.mk
+    3. Qualcomm init.rc DeviceAsWebcam patch (LineageOS Gerrit #395890)
+  On SM8550, the usbd daemon runs in sys.usb.configfs=2 mode and owns the
+  USB gadget HAL. A KSU module cannot write to configfs while usbd runs
+  without causing conflicts. DroidCam does NOT use UVC gadget — it uses a
+  v4l2loopback module on the host Linux side with TCP streaming; no kernel
+  change is needed on the Android device for DroidCam to work.
 
 CONFIG_USB_CONFIGFS_F_UAC2=y
-  USB Audio Class 2.0 (UAC2) gadget function.
+  USB Audio Class 2.0 (UAC2) gadget function — KERNEL PREREQUISITE ONLY.
+  Creates an ALSA sound card (UAC2Gadget) visible on the host USB side.
+  Full functionality requires:
+    - A userspace tinyalsa bridge daemon to pipe phone mic → UAC2 ALSA card
+    - Registration in audio_policy_configuration.xml for AudioFlinger routing
+  Without these, the UAC2 card exists but no audio flows through it.
+  NOTE: The UAC2 capture direction (host→device) has no timing mechanism in
+  the upstream driver, causing arecord pipeline instability in that direction.
   Phone appears as a professional USB audio interface to any connected
   host. Use case: record clean audio from phone's microphones or
   3.5mm input into a laptop DAW (Pro Tools, Logic, Reaper) in real-time.
