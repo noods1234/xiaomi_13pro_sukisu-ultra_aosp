@@ -1,9 +1,9 @@
 [
     {
         "kernelSource": {
-            "name": "ishtar-cinema-kernel_aospa-vauxite",
-            "repo": "https://github.com/AOSPA/android_kernel_xiaomi_sm8550.git",
-            "branch": "vauxite",
+            "name": "ishtar-cinema-kernel_crdroid-gki66",
+            "repo": "https://github.com/crdroidandroid/android_kernel_xiaomi_sm8550.git",
+            "branch": "16.0",
             "device": "gki",
             "defconfig": "gki_defconfig"
         },
@@ -48,7 +48,7 @@
         "enableKernelSU": true,
         "KernelSUSFS": {
             "enable": true,
-            "branches": "gki-android14-5.15"
+            "branches": "gki-android15-6.6"
         }
     }
 ]
