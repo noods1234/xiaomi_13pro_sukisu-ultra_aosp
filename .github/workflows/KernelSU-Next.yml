@@ -662,7 +662,7 @@ jobs:
           ANYKERNEL3_FILE: "${{ env.WORKSPACE }}/AnyKernel3-${{ env.KERNEL_NAME }}-Cinema-KernelSU_Next-${{ env.BUILD_DATE }}"
           RELEASE_NAME: "Xiaomi 13 Ultra (Ishtar) - Cinema / KernelSU Next / KPM / SUSFS"
           RELEASE_NOTES: |
-            Cinema kernel build for Xiaomi 13 Ultra (ishtar) — SM8550 / GKI 5.15
+            Cinema kernel build for Xiaomi 13 Ultra (ishtar) — SM8550 / GKI 5.15 & 6.6
 
             === CINEMA FEATURES ===
             -> DisplayPort Alt Mode (USB-C external monitor/recorder output)
