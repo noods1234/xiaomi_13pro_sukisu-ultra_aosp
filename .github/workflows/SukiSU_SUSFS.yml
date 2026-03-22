@@ -261,7 +261,10 @@ jobs:
           fi
 
           # Apply new KernelSU patches
-          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-test
+          # Clone repo first, then run setup.sh locally — avoids curl|bash code
+          # execution from a mutable branch ref with no checksum verification.
+          git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git ../SukiSU-Ultra-src
+          bash ../SukiSU-Ultra-src/kernel/setup.sh susfs-test
           cd ./KernelSU
           
           KSU_VERSION=$(expr $(/usr/bin/git rev-list --count main) "+" 10606)
@@ -298,19 +301,26 @@ jobs:
           cp -r ../SukiSU_patch/other/zram/lz4k_oplus ./lib/
 
           # Apply common SUSFS patch
-          patch -p1 < 50_add_susfs_in_${{ env.SFS_BRANCH }}.patch
-          
+          if ! patch -p1 < 50_add_susfs_in_${{ env.SFS_BRANCH }}.patch; then
+            echo "❌ Common SUSFS patch failed — aborting"
+            exit 1
+          fi
+
           cp ../SukiSU_patch/hooks/syscall_hooks.patch ./
           patch -p1 -F 3 < syscall_hooks.patch
 
           # Apply lz4kd Patches (kernel-version-aware path)
           KERNEL_VER=$(echo "${{ env.SFS_BRANCH }}" | grep -oP '\d+\.\d+$')
-          LZ4KD_PATCH="../SukiSU_patch/other/zram/zram_patch/${KERNEL_VER}/lz4kd.patch"
-          if [ -f "$LZ4KD_PATCH" ]; then
-            cp "$LZ4KD_PATCH" ./lz4kd.patch
-            patch -p1 -F 3 < lz4kd.patch || true
+          if [ -z "$KERNEL_VER" ]; then
+            echo "⚠️  Could not extract kernel version from SFS_BRANCH='${{ env.SFS_BRANCH }}' — skipping lz4kd patch"
           else
-            echo "⚠️  lz4kd patch not found for kernel ${KERNEL_VER} — skipping"
+            LZ4KD_PATCH="../SukiSU_patch/other/zram/zram_patch/${KERNEL_VER}/lz4kd.patch"
+            if [ -f "$LZ4KD_PATCH" ]; then
+              cp "$LZ4KD_PATCH" ./lz4kd.patch
+              patch -p1 -F 3 < lz4kd.patch || true
+            else
+              echo "⚠️  lz4kd patch not found for kernel ${KERNEL_VER} — skipping"
+            fi
           fi
 
           # Add KSU configuration settings
@@ -631,7 +641,7 @@ jobs:
         env:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
         with:
-          name: ${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}-Image
+          name: ${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}.${{ github.run_number }}-Image
           path: ${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/Image
           if-no-files-found: ignore
           retention-days: 7
@@ -641,7 +651,7 @@ jobs:
         env:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
         with:
-          name: ${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}-Image.gz
+          name: ${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}.${{ github.run_number }}-Image.gz
           path: ${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/Image.gz
           if-no-files-found: ignore
           retention-days: 7
@@ -651,7 +661,7 @@ jobs:
         env:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
         with:
-          name: ${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}-Image.gz-dtb
+          name: ${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}.${{ github.run_number }}-Image.gz-dtb
           path: ${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/Image.gz-dtb
           if-no-files-found: ignore
           retention-days: 7
@@ -661,7 +671,7 @@ jobs:
         env:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
         with:
-          name: ${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}-dtb
+          name: ${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}.${{ github.run_number }}-dtb
           path: ${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/dtb
           if-no-files-found: ignore
           retention-days: 7
@@ -671,7 +681,7 @@ jobs:
         env:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
         with:
-          name: ${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}-dtbo.img
+          name: ${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}.${{ github.run_number }}-dtbo.img
           path: ${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/dtbo.img
           if-no-files-found: ignore
           retention-days: 7
@@ -681,7 +691,7 @@ jobs:
         env:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
         with:
-          name: ${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}-Output
+          name: ${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}.${{ github.run_number }}-Output
           path: ${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/
           retention-days: 7
 
