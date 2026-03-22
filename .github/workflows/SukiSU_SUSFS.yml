@@ -456,6 +456,27 @@ jobs:
 
           echo "✅ Cinema kernel features appended to $CONFIG_FILE"
 
+      - name: ✅ Validate cinema flags written to defconfig
+        env:
+          ARCH: ${{ steps.generate-args.outputs.ARCH }}
+        run: |
+          cd ${{ env.KERNEL_NAME }}
+          CONFIG_FILE="arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}"
+          echo "--- Cinema defconfig flag check ---"
+          MISSING=0
+          for flag in CONFIG_MI_ENABLE_DP CONFIG_SND_USB_AUDIO CONFIG_USB_UAS \
+                      CONFIG_MEDIA_SUPPORT CONFIG_DMABUF_HEAPS CONFIG_HIGH_RES_TIMERS \
+                      CONFIG_USB_CONFIGFS_F_UVC CONFIG_KSU CONFIG_KPM \
+                      CONFIG_EXFAT_FS CONFIG_NTFS3 CONFIG_USB_XHCI_HCD; do
+            if grep -q "^${flag}=y" "$CONFIG_FILE"; then
+              echo "✅  ${flag}"
+            else
+              echo "❌  ${flag} not found in defconfig"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+          echo "--- ${MISSING} flag(s) missing from defconfig ---"
+
       - name: ⏱️ Enable HZ_1000 (experimental)
         if: ${{ env.ENABLE_HZ_1000 == 'true' }}
         env:
@@ -549,17 +570,51 @@ jobs:
           make ${{ env.ARGS }}
           # tree ${{ env.OUT_DIR }}
 
-      - name: 🔥 Add KPM patch
-        env: 
+      - name: 🔍 Verify kernel Image
+        env:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
-        run: |         
+        run: |
+          IMAGE="${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/Image"
+          if [ ! -f "$IMAGE" ]; then
+            echo "❌ Kernel Image not found after build"
+            exit 1
+          fi
+          SIZE=$(stat -c%s "$IMAGE")
+          echo "ℹ️  Kernel Image size: ${SIZE} bytes"
+          if [ "$SIZE" -lt 10000000 ]; then
+            echo "❌ Kernel Image suspiciously small (${SIZE} bytes < 10 MB) — possible build failure"
+            exit 1
+          fi
+          echo "✅ Kernel Image looks valid (${SIZE} bytes)"
+
+      - name: 🔥 Add KPM patch
+        env:
+          ARCH: ${{ steps.generate-args.outputs.ARCH }}
+        run: |
           echo "Patching Image file..."
+          # Use the already-cloned SukiSU_patch repo — avoids fetching an
+          # unverified binary from a mutable branch ref at build time.
+          PATCH_BIN="${{ env.WORKSPACE }}/SukiSU_patch/kpm/patch_linux"
+          if [ ! -f "$PATCH_BIN" ]; then
+            echo "❌ KPM patch binary not found: $PATCH_BIN"
+            exit 1
+          fi
+          if ! file "$PATCH_BIN" | grep -q "ELF"; then
+            echo "❌ KPM patch binary is not an ELF executable — aborting"
+            exit 1
+          fi
+          PATCH_SHA256=$(sha256sum "$PATCH_BIN" | awk '{print $1}')
+          echo "ℹ️  KPM patch_linux SHA256: ${PATCH_SHA256}"
+          chmod 755 "$PATCH_BIN"
           cd "${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot"
-          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
-          chmod 777 patch
-          ./patch
-          rm -rf Image
+          "$PATCH_BIN"
+          if [ ! -f oImage ]; then
+            echo "❌ KPM patch did not produce oImage — aborting"
+            exit 1
+          fi
+          rm -f Image
           mv oImage Image
+          echo "✅ KPM patch applied"
 
       - name: 💛 Upload Image
         uses: actions/upload-artifact@v4
@@ -678,14 +733,19 @@ jobs:
           RELEASE_NOTES: |
             Cinema kernel build for Xiaomi 13 Ultra (ishtar) — SM8550 / GKI 5.15 & 6.6
 
-            === CINEMA FEATURES ===
-            -> DisplayPort Alt Mode (USB-C external monitor/recorder output)
-            -> USB Audio Class 2.0 (XLR interfaces, external mics, mixers)
-            -> USB UAS fast storage (USB-C SSD offload at full speed)
-            -> V4L2 media framework (camera pipeline, external capture)
-            -> 1000Hz timer (low-latency audio/video frame scheduling)
-            -> USB UVC gadget (phone as USB camera output)
-            -> USB UAC2 gadget (phone as USB audio source)
+            === CINEMA KERNEL FEATURES (active with compatible ROM) ===
+            -> DisplayPort Alt Mode enabled (USB-C → monitor/recorder via QTI PMIC GLINK)
+            -> USB Audio Class 2.0 (external XLR mics, mixers, recorders via USB-C)
+            -> USB UAS protocol (USB-C SSD offload at full UAS speed ~1800 MB/s)
+            -> V4L2 media framework + DMA-BUF zero-copy camera pipeline
+            -> High-resolution timers (sub-ms A/V sync, CONFIG_HIGH_RES_TIMERS)
+            -> ZRAM lz4k/lz4kd compression (improved memory headroom for 4K)
+            -> exFAT + NTFS3 filesystem support for cinema drives
+
+            === CINEMA KERNEL PREREQUISITES (require ROM-level changes) ===
+            -> USB UVC gadget: kernel-ready — needs DeviceAsWebcam ROM app + ro.usb.uvc.enabled=true
+            -> USB UAC2 gadget: kernel-ready — needs tinyalsa userspace daemon + audio_policy XML
+            -> ALSA loopback (SND_ALOOP): kernel-ready — blocked by SELinux without custom Audio HAL
 
             === ROOT / SECURITY ===
             -> SukiSU Ultra (kernel-mode root)
