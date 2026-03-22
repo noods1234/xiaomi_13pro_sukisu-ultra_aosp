@@ -1,30 +1,33 @@
 # Cinema Kernel — External Dependency Lockfile
-# All SHA values were collected 2026-03-22 via git ls-remote / GitHub API.
+# All SHA values live-verified 2026-03-22 via git ls-remote.
 #
 # HOW TO UPDATE:
-#   For git repos: git ls-remote <url> <ref> | awk '{print $1}'
-#   Then update the SHA here AND the workflow clone command below.
+#   git ls-remote <url> <ref> | awk '{print $1}'
+#   Update the SHA here; the workflows hard-fail on mismatch.
 #
-# FORMAT: <name> <sha> <url> <ref>
+# FORMAT: <name> <git-commit-sha> <url> <ref>
+# Active configs: ishtar-cinema.config.json (android14-5.15)
+#                 ishtar-cinema-a15.config.json (android15-6.6)
 
-# ── Root solution ────────────────────────────────────────────────────────────
-SukiSU-Ultra        5a0439cc4fa39e25082f8e48d9de3c3a5631bc0d  https://github.com/SukiSU-Ultra/SukiSU-Ultra.git               main
-KernelSU-Next       4855fa3a844579eca5171aae7f3805fd72729b56  https://github.com/KernelSU-Next/KernelSU-Next.git             stable
+# ── SukiSU-Ultra (SukiSU_SUSFS workflow only) ────────────────────────────────
+SukiSU-Ultra        5a0439cc4fa39e25082f8e48d9de3c3a5631bc0d  https://github.com/SukiSU-Ultra/SukiSU-Ultra.git      main
 
-# ── Patch repositories ───────────────────────────────────────────────────────
-SukiSU_patch        547ae94bcaec53d030398f857950c64662043a5d  https://github.com/ShirkNeko/SukiSU_patch.git                  main
-kernel_patches      e2647600959bbb5cf723e59ccbbfbe5a41aca5e4  https://github.com/WildPlusKernel/kernel_patches.git           main
+# ── KernelSU-Next (KernelSU-Next workflow only) ──────────────────────────────
+KernelSU-Next       4855fa3a844579eca5171aae7f3805fd72729b56  https://github.com/KernelSU-Next/KernelSU-Next.git    stable
 
-# ── AnyKernel3 ───────────────────────────────────────────────────────────────
-AnyKernel3          dca9dc370838d919d56c1f59ec78b27a14a72c68  https://github.com/osm0sis/AnyKernel3.git                     master
+# ── Patch repositories (both workflows) ──────────────────────────────────────
+SukiSU_patch        547ae94bcaec53d030398f857950c64662043a5d  https://github.com/ShirkNeko/SukiSU_patch.git         main
+kernel_patches      e2647600959bbb5cf723e59ccbbfbe5a41aca5e4  https://github.com/WildPlusKernel/kernel_patches.git  main
 
-# ── SUSFS (per kernel branch) ────────────────────────────────────────────────
-susfs4ksu-gki-android13-5.15   20303f6d3eb043fa04a7590b0e9f1c70a7d008e9  https://gitlab.com/simonpunk/susfs4ksu.git  gki-android13-5.15
-susfs4ksu-gki-android14-5.15   09e4ae15097b71ee49636d5ba2ae0f63927386fa  https://gitlab.com/simonpunk/susfs4ksu.git  gki-android14-5.15
-susfs4ksu-gki-android14-6.1    a7e32a55f8895d32e29a11d4e35b2bc7f587df19  https://gitlab.com/simonpunk/susfs4ksu.git  gki-android14-6.1
-susfs4ksu-gki-android15-6.6    2e3f3907dfbebbb96e2fe737a856d58829e3db25  https://gitlab.com/simonpunk/susfs4ksu.git  gki-android15-6.6
+# ── AnyKernel3 (both workflows) ──────────────────────────────────────────────
+AnyKernel3          dca9dc370838d919d56c1f59ec78b27a14a72c68  https://github.com/osm0sis/AnyKernel3.git             master
 
-# ── KPM binary (patch_linux) ─────────────────────────────────────────────────
-# SHA256 stored separately in Kernel/kpm/patch_linux.sha256
-# This entry tracks the SukiSU_patch repo commit that produced that binary.
-patch_linux-binary  1bd00563e9d8fbbd11a16c0c1c59c5add406e6c5c92557def50f93d6f0aebe2d  SHA256-of-ELF  n/a
+# ── SUSFS — only branches used by active configs ─────────────────────────────
+# android13-5.15 and android14-6.1 are NOT listed — no active config uses them.
+susfs4ksu-gki-android14-5.15  09e4ae15097b71ee49636d5ba2ae0f63927386fa  https://gitlab.com/simonpunk/susfs4ksu.git  gki-android14-5.15
+susfs4ksu-gki-android15-6.6   2e3f3907dfbebbb96e2fe737a856d58829e3db25  https://gitlab.com/simonpunk/susfs4ksu.git  gki-android15-6.6
+
+# ── KPM binary ───────────────────────────────────────────────────────────────
+# SHA256 of patch_linux ELF is pinned in Kernel/kpm/patch_linux.sha256.
+# The binary is taken from the SukiSU_patch clone (pinned above), so no
+# separate git entry is needed here.
