@@ -285,7 +285,10 @@ jobs:
           # Applying SUSFS patches
           cd ./KernelSU-Next
           cp ../../kernel_patches/next/0001-kernel-patch-susfs-v1.5.7-to-KernelSU-Next-v1.0.7.patch ./
-          patch -p1 --forward --fuzz=3 < 0001-kernel-patch-susfs-v1.5.7-to-KernelSU-Next-v1.0.7.patch
+          if ! patch -p1 --forward --fuzz=3 < 0001-kernel-patch-susfs-v1.5.7-to-KernelSU-Next-v1.0.7.patch; then
+            echo "❌ SUSFS KernelSU-Next integration patch failed — aborting"
+            exit 1
+          fi
 
           # Apply common SUSFS patch
           cd ..
@@ -337,7 +340,8 @@ jobs:
           echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}
           echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}
-          
+          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}
+
           # Add additional tmpfs config setting
           echo "CONFIG_TMPFS_XATTR=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}
@@ -367,12 +371,12 @@ jobs:
             echo $config >> ${{ env.DEFCONFIG }}
           done
 
-          # Apply patch
+          # Apply patch — use a per-run temp file to avoid collisions in parallel builds
+          TMP_FILE="/tmp/cgroup_patch_${{ github.run_id }}_${{ github.job }}.txt"
           if [ -f kernel/cgroup.c ]; then
             row=$(sed -n -e '/^static int cgroup_add_file/=' kernel/cgroup.c)
-            touch /tmp/tmp.txt
-            sed -n -e '/static int cgroup_add_file/,/return 0/p' kernel/cgroup.c >> /tmp/tmp.txt
-            row2=$(sed -n -e '/return 0/=' /tmp/tmp.txt)
+            sed -n -e '/static int cgroup_add_file/,/return 0/p' kernel/cgroup.c > "$TMP_FILE"
+            row2=$(sed -n -e '/return 0/=' "$TMP_FILE")
             row3=$(echo `expr $row + $row2 - 1`)
             sed -i "$row3 i\        }" kernel/cgroup.c
             sed -i "$row3 i\                kernfs_create_link(cgrp->kn, name, kn);" kernel/cgroup.c
@@ -382,9 +386,8 @@ jobs:
           fi
           if [ -f kernel/cgroup/cgroup.c ]; then
             row=$(sed -n -e '/^static int cgroup_add_file/=' kernel/cgroup/cgroup.c)
-            touch /tmp/tmp.txt
-            sed -n -e '/static int cgroup_add_file/,/return 0/p' kernel/cgroup/cgroup.c >> /tmp/tmp.txt
-            row2=$(sed -n -e '/return 0/=' /tmp/tmp.txt)
+            sed -n -e '/static int cgroup_add_file/,/return 0/p' kernel/cgroup/cgroup.c > "$TMP_FILE"
+            row2=$(sed -n -e '/return 0/=' "$TMP_FILE")
             row3=$(echo `expr $row + $row2 - 1`)
             sed -i "$row3 i\        }" kernel/cgroup/cgroup.c
             sed -i "$row3 i\                kernfs_create_link(cgrp->kn, name, kn);" kernel/cgroup/cgroup.c
@@ -396,6 +399,7 @@ jobs:
             git am -s < ${{ env.WORKSPACE }}/LXC/Patches/xt_qtaguid.patch
             echo "🎖️ Apply xt_qtaguid.patch"
           fi
+          rm -f "$TMP_FILE"
 
       - name: 🎬 Setup Cinema Kernel Features
         env:
@@ -517,7 +521,7 @@ jobs:
           MISSING=0
           for flag in CONFIG_MI_ENABLE_DP CONFIG_SND_USB_AUDIO CONFIG_USB_UAS \
                       CONFIG_MEDIA_SUPPORT CONFIG_DMABUF_HEAPS CONFIG_HIGH_RES_TIMERS \
-                      CONFIG_USB_CONFIGFS_F_UVC CONFIG_KSU CONFIG_KPM \
+                      CONFIG_USB_CONFIGFS_F_UVC CONFIG_KSU CONFIG_KSU_SUSFS CONFIG_KPM \
                       CONFIG_EXFAT_FS CONFIG_NTFS3 CONFIG_USB_XHCI_HCD \
                       CONFIG_CRYPTO_LZ4K CONFIG_CRYPTO_LZ4KD; do
             if grep -q "^${flag}=y" "$CONFIG_FILE"; then
@@ -591,8 +595,8 @@ jobs:
           fi
           SIZE=$(stat -c%s "$IMAGE")
           echo "ℹ️  Kernel Image size: ${SIZE} bytes"
-          if [ "$SIZE" -lt 10000000 ]; then
-            echo "❌ Kernel Image suspiciously small (${SIZE} bytes < 10 MB) — possible build failure"
+          if [ "$SIZE" -lt 20000000 ]; then
+            echo "❌ Kernel Image suspiciously small (${SIZE} bytes < 20 MB) — possible build failure"
             exit 1
           fi
           echo "✅ Kernel Image looks valid (${SIZE} bytes)"
