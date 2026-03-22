@@ -38,6 +38,8 @@ jobs:
     runs-on: ubuntu-22.04
     needs:
       - Read-configuration
+    permissions:
+      contents: write
     strategy:
       max-parallel: 4
       fail-fast: false
@@ -154,22 +156,22 @@ jobs:
         env:
           toolchains: "${{ toJSON(matrix.CONFIG.toolchains) }}"
         run: |
-          toolchains_num="$(echo $toolchains | jq 'length')"
+          toolchains_num="$(echo "$toolchains" | jq 'length')"
           echo "🤔 There is $toolchains_num defined toolchains."
 
           for ((i=0;i<toolchains_num;i++)); do
-            toolchain=$(echo $toolchains | jq -r ".[$i]")
+            toolchain="$(echo "$toolchains" | jq -r ".[$i]")"
 
-            toolchain_name=$(echo $toolchain | jq -r ".name")
-            
+            toolchain_name="$(echo "$toolchain" | jq -r ".name")"
+
             # From archive
-            if echo $toolchain | jq -e 'has("url")' > /dev/null; then
+            if echo "$toolchain" | jq -e 'has("url")' > /dev/null; then
               # If from archive
-              toolchain_url=$(echo $toolchain | jq -r ".url")
+              toolchain_url="$(echo "$toolchain" | jq -r ".url")"
               mkdir -p "$toolchain_name"
 
               # Download archive
-              wget "$toolchain_url"
+              wget -- "$toolchain_url"
 
               # Get filename
               filename="${toolchain_url##*/}"
@@ -190,15 +192,15 @@ jobs:
                   echo "unknown file type: $filename"
                   ;;
               esac
-              # Delete file to avoid duplicate name conflicts 
-              rm $filename
+              # Delete file to avoid duplicate name conflicts
+              rm -- "$filename"
 
               echo "🤔 Download $toolchain_name => ($toolchain_url)"
             else
               # If from git
-              toolchain_repo=$(echo $toolchain | jq -r ".repo")
-              toolchain_branch=$(echo $toolchain | jq -r ".branch")
-              git clone --recursive --depth=1 -j $(nproc) --branch $toolchain_branch $toolchain_repo $toolchain_name
+              toolchain_repo="$(echo "$toolchain" | jq -r ".repo")"
+              toolchain_branch="$(echo "$toolchain" | jq -r ".branch")"
+              git clone --recursive --depth=1 -j "$(nproc)" --branch "$toolchain_branch" "$toolchain_repo" "$toolchain_name"
 
               echo "🤔 Clone $toolchain_name => ($toolchain_repo)"
             fi
@@ -252,29 +254,47 @@ jobs:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
         if: ${{ env.ENABLE_KERNELSU == 'true' && env.ENABLE_KERNELSU_SFS == 'true' }}
         run: |
-          # Delete old KernelSU
-          if [ -d "./KernelSU" ]; then
-            rm -rf "./KernelSU"
-          fi
-          if [ -d "./drivers/kernelsu" ]; then
-            rm -rf "./drivers/kernelsu"
-          fi
+          # Remove any stale KernelSU directories
+          rm -rf ./KernelSU ./drivers/kernelsu
 
-          # Apply new KernelSU patches
-          # Clone repo first, then run setup.sh locally — avoids curl|bash code
-          # execution from a mutable branch ref with no checksum verification.
-          git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git ../SukiSU-Ultra-src
-          bash ../SukiSU-Ultra-src/kernel/setup.sh susfs-test
-          cd ./KernelSU
-          
-          KSU_VERSION=$(expr $(/usr/bin/git rev-list --count main) "+" 10606)
-          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-          export KSU_VERSION=$KSU_VERSION
-          
-          sed -i "s/DKSU_VERSION=12800/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
+          # Clone SukiSU-Ultra at the pinned commit SHA from dependencies.lock.
+          # We do NOT use setup.sh because it runs `git pull` internally, which
+          # would silently replace the cloned content with an unverified HEAD.
+          EXPECTED_SHA=$(grep '^SukiSU-Ultra ' "${{ env.WORKSPACE }}/Kernel/dependencies.lock" | awk '{print $2}')
+          git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git KernelSU
+          ACTUAL_SHA=$(git -C KernelSU rev-parse HEAD)
+          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo "❌ SukiSU-Ultra SHA mismatch: got ${ACTUAL_SHA} expected ${EXPECTED_SHA}"
+            echo "   Update Kernel/dependencies.lock if a new release is intended."
+            exit 1
+          fi
+          echo "✅ SukiSU-Ultra SHA verified: ${ACTUAL_SHA}"
 
-          cd ../
-          cat arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}
+          # Wire KernelSU into the kernel build system manually (replaces setup.sh):
+          #   1. Locate the drivers directory (varies by kernel source layout)
+          #   2. Create a kernelsu symlink pointing to KernelSU/kernel/
+          #   3. Append obj-$(CONFIG_KSU) and Kconfig source if not already present
+          KERNEL_ROOT=$(pwd)
+          if [ -d "./common/drivers" ]; then
+            DRIVER_DIR="./common/drivers"
+          elif [ -d "./drivers" ]; then
+            DRIVER_DIR="./drivers"
+          else
+            echo "❌ Could not locate drivers/ directory — aborting"
+            exit 1
+          fi
+          ln -sf "$(realpath --relative-to="${DRIVER_DIR}" "${KERNEL_ROOT}/KernelSU/kernel")" "${DRIVER_DIR}/kernelsu"
+          grep -qF 'kernelsu' "${DRIVER_DIR}/Makefile" \
+            || echo 'obj-$(CONFIG_KSU) += kernelsu/' >> "${DRIVER_DIR}/Makefile"
+          grep -qF 'source "drivers/kernelsu/Kconfig"' "${DRIVER_DIR}/Kconfig" \
+            || sed -i '/^endmenu/i\source "drivers/kernelsu/Kconfig"' "${DRIVER_DIR}/Kconfig"
+
+          # Compute and stamp the KSU version number
+          KSU_VERSION=$(expr $(git -C KernelSU rev-list --count HEAD) "+" 10606)
+          echo "KSUVER=${KSU_VERSION}" >> $GITHUB_ENV
+          sed -i "s/DKSU_VERSION=12800/DKSU_VERSION=${KSU_VERSION}/" KernelSU/kernel/Makefile
+
+          cat "arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}"
           
       - name: 😋 Setup SukiSU SUSFS
         env: 
@@ -647,6 +667,9 @@ jobs:
           rm -f Image
           mv oImage Image
           echo "✅ KPM patch applied"
+          # Log SHA256 of patched Image for build auditability
+          PATCHED_SHA=$(sha256sum Image | awk '{print $1}')
+          echo "ℹ️  Patched Image SHA256: ${PATCHED_SHA}"
 
       - name: 💛 Upload Image
         uses: actions/upload-artifact@v4
