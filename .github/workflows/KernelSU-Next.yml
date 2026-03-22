@@ -218,8 +218,8 @@ jobs:
         run: |
           echo "🤔 PATH Variable: $PATH"
 
-          ARCH=$(echo $PARAMS | jq -r ".ARCH")
-          CC=$(echo $PARAMS | jq -r ".CC")
+          ARCH=$(echo "$PARAMS" | jq -r ".ARCH")
+          CC=$(echo "$PARAMS" | jq -r ".CC")
 
           args="-j${{ env.THREAD }} O=${{ env.OUT_DIR }} ARCH=$ARCH"
           if [ -n "$CC" ]; then
@@ -298,10 +298,47 @@ jobs:
           SFS_BRANCH: ${{ matrix.CONFIG.KernelSUSFS.branches }}
         if: ${{ env.ENABLE_KERNELSU == 'true' && env.ENABLE_KERNELSU_SFS == 'true' }}
         run: |
-          # Clone repositories using the branch names
-          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "${{ env.SFS_BRANCH }}"
-          git clone https://github.com/WildPlusKernel/kernel_patches.git
+          SFS_BRANCH="${{ env.SFS_BRANCH }}"
+          LOCKFILE="${{ env.WORKSPACE }}/Kernel/dependencies.lock"
+
+          # susfs4ksu — depth=1 clone, then verify SHA
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b "${SFS_BRANCH}"
+          SUSFS_EXPECTED=$(grep "^susfs4ksu-${SFS_BRANCH} " "${LOCKFILE}" | awk '{print $2}')
+          SUSFS_ACTUAL=$(git -C susfs4ksu rev-parse HEAD)
+          if [ -z "$SUSFS_EXPECTED" ]; then
+            echo "⚠️  No lockfile entry for susfs4ksu-${SFS_BRANCH} — add one to Kernel/dependencies.lock"
+          elif [ "$SUSFS_ACTUAL" != "$SUSFS_EXPECTED" ]; then
+            echo "❌ susfs4ksu SHA mismatch for branch ${SFS_BRANCH}"
+            echo "   Got:      ${SUSFS_ACTUAL}"
+            echo "   Expected: ${SUSFS_EXPECTED}"
+            exit 1
+          else
+            echo "✅ susfs4ksu SHA verified: ${SUSFS_ACTUAL}"
+          fi
+
+          # kernel_patches — depth=1 clone, then verify SHA
+          git clone --depth=1 https://github.com/WildPlusKernel/kernel_patches.git
+          KP_EXPECTED=$(grep '^kernel_patches ' "${LOCKFILE}" | awk '{print $2}')
+          KP_ACTUAL=$(git -C kernel_patches rev-parse HEAD)
+          if [ "$KP_ACTUAL" != "$KP_EXPECTED" ]; then
+            echo "❌ kernel_patches SHA mismatch"
+            echo "   Got:      ${KP_ACTUAL}"
+            echo "   Expected: ${KP_EXPECTED}"
+            exit 1
+          fi
+          echo "✅ kernel_patches SHA verified: ${KP_ACTUAL}"
+
+          # SukiSU_patch — depth=1 clone, then verify SHA
           git clone --depth=1 https://github.com/ShirkNeko/SukiSU_patch.git
+          PATCH_EXPECTED=$(grep '^SukiSU_patch ' "${LOCKFILE}" | awk '{print $2}')
+          PATCH_ACTUAL=$(git -C SukiSU_patch rev-parse HEAD)
+          if [ "$PATCH_ACTUAL" != "$PATCH_EXPECTED" ]; then
+            echo "❌ SukiSU_patch SHA mismatch"
+            echo "   Got:      ${PATCH_ACTUAL}"
+            echo "   Expected: ${PATCH_EXPECTED}"
+            exit 1
+          fi
+          echo "✅ SukiSU_patch SHA verified: ${PATCH_ACTUAL}"
 
           # Copy SUSFS patches
           cd ${{ env.KERNEL_NAME }}
@@ -742,36 +779,39 @@ jobs:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
           ANYKERNEL3_FILE: "${{ env.WORKSPACE }}/AnyKernel3-${{ env.KERNEL_NAME }}-Cinema-KernelSU_Next-${{ env.BUILD_DATE }}"
         run: |
-          if echo -n '${{ env.PARAMS }}' | jq -e 'has("custom")' > /dev/null; then
-            CUSTOM_ANYKERNEL3=$(echo -n '${{ env.PARAMS }}' | jq -r ".custom")
-            ANYKERNEL_REPO=$(echo $CUSTOM_ANYKERNEL3 | jq -r ".repo")
-            ANYKERNEL_BRANCH=$(echo $CUSTOM_ANYKERNEL3 | jq -r ".branch")
-            git clone --recursive --depth=1 -j $(nproc) --branch $ANYKERNEL_BRANCH $ANYKERNEL_REPO AnyKernel3
+          LOCKFILE="${{ env.WORKSPACE }}/Kernel/dependencies.lock"
+          PARAMS='${{ env.PARAMS }}'
+          if echo -n "$PARAMS" | jq -e 'has("custom")' > /dev/null; then
+            CUSTOM_ANYKERNEL3="$(echo -n "$PARAMS" | jq -r ".custom")"
+            ANYKERNEL_REPO="$(echo "$CUSTOM_ANYKERNEL3" | jq -r ".repo")"
+            ANYKERNEL_BRANCH="$(echo "$CUSTOM_ANYKERNEL3" | jq -r ".branch")"
+            git clone --recursive --depth=1 -j "$(nproc)" --branch "$ANYKERNEL_BRANCH" "$ANYKERNEL_REPO" AnyKernel3
             echo "🤔 Use custom AnyKernel3 => ($ANYKERNEL_REPO)"
           else
-            git clone --recursive --depth=1 -j $(nproc) https://github.com/osm0sis/AnyKernel3 AnyKernel3
+            git clone --recursive --depth=1 -j "$(nproc)" https://github.com/osm0sis/AnyKernel3 AnyKernel3
+            AK3_EXPECTED=$(grep '^AnyKernel3 ' "${LOCKFILE}" | awk '{print $2}')
+            AK3_ACTUAL=$(git -C AnyKernel3 rev-parse HEAD)
+            if [ "$AK3_ACTUAL" != "$AK3_EXPECTED" ]; then
+              echo "❌ AnyKernel3 SHA mismatch"
+              echo "   Got:      ${AK3_ACTUAL}"
+              echo "   Expected: ${AK3_EXPECTED}"
+              exit 1
+            fi
+            echo "✅ AnyKernel3 SHA verified: ${AK3_ACTUAL}"
             sed -i 's/do.devicecheck=1/do.devicecheck=0/g' AnyKernel3/anykernel.sh
             sed -i 's!BLOCK=/dev/block/platform/omap/omap_hsmmc.0/by-name/boot;!BLOCK=auto;!g' AnyKernel3/anykernel.sh
             sed -i 's/is_slot_device=0;/is_slot_device=auto;/g' AnyKernel3/anykernel.sh
             echo "🤔 Use origin Anykernel3 => (https://github.com/osm0sis/AnyKernel3)"
           fi
 
-
-          if [ -e "${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/Image.gz-dtb" ]; then
-            cp -f ${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/Image.gz-dtb ./AnyKernel3/
+          BOOT_DIR="${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot"
+          if [ -e "${BOOT_DIR}/Image.gz-dtb" ]; then
+            cp -f "${BOOT_DIR}/Image.gz-dtb" ./AnyKernel3/
           else
-            if [ -e "${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/Image" ]; then
-              cp -f ${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/Image ./AnyKernel3/
-            fi
-            if [ -e "${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/Image.gz" ]; then
-              cp -f ${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/Image.gz ./AnyKernel3/
-            fi
-            if [ -e "${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/dtbo" ]; then
-              cp -f ${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/dtbo ./AnyKernel3/
-            fi
-            if [ -e "${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/dtbo.img" ]; then
-              cp -f ${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot/dtbo.img ./AnyKernel3/
-            fi
+            [ -e "${BOOT_DIR}/Image" ]      && cp -f "${BOOT_DIR}/Image"      ./AnyKernel3/
+            [ -e "${BOOT_DIR}/Image.gz" ]   && cp -f "${BOOT_DIR}/Image.gz"   ./AnyKernel3/
+            [ -e "${BOOT_DIR}/dtbo" ]       && cp -f "${BOOT_DIR}/dtbo"       ./AnyKernel3/
+            [ -e "${BOOT_DIR}/dtbo.img" ]   && cp -f "${BOOT_DIR}/dtbo.img"   ./AnyKernel3/
           fi
 
           cd AnyKernel3/
