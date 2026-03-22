@@ -1,0 +1,11 @@
+# Expected SHA256 for ShirkNeko/SukiSU_patch kpm/patch_linux
+# Binary: ELF 64-bit x86-64 statically linked, 6013320 bytes
+# Source: https://github.com/ShirkNeko/SukiSU_patch/blob/main/kpm/patch_linux
+# BuildID: a48ddc3abf3e212583f27cb7c34d99394691d883
+#
+# To update this hash when SukiSU_patch releases a new version:
+#   curl -LSs https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux -o /tmp/patch_linux
+#   sha256sum /tmp/patch_linux
+# Then open a PR updating this file and both workflow files.
+#
+1bd00563e9d8fbbd11a16c0c1c59c5add406e6c5c92557def50f93d6f0aebe2d

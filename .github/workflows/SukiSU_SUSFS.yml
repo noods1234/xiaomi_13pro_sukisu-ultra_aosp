@@ -625,6 +625,18 @@ jobs:
           fi
           PATCH_SHA256=$(sha256sum "$PATCH_BIN" | awk '{print $1}')
           echo "ℹ️  KPM patch_linux SHA256: ${PATCH_SHA256}"
+          # Verify SHA256 against pinned expected hash stored in repo.
+          # To update: run sha256sum on the new binary and update
+          # Kernel/kpm/patch_linux.sha256 in a PR.
+          EXPECTED_SHA256=$(grep -v '^#' "${{ env.WORKSPACE }}/Kernel/kpm/patch_linux.sha256" | tr -d '[:space:]')
+          if [ "$PATCH_SHA256" != "$EXPECTED_SHA256" ]; then
+            echo "❌ KPM patch_linux SHA256 mismatch!"
+            echo "   Got:      ${PATCH_SHA256}"
+            echo "   Expected: ${EXPECTED_SHA256}"
+            echo "   If SukiSU_patch released a new binary, update Kernel/kpm/patch_linux.sha256"
+            exit 1
+          fi
+          echo "✅ KPM binary hash verified"
           chmod 755 "$PATCH_BIN"
           cd "${{ env.OUT_DIR }}/arch/${{ env.ARCH }}/boot"
           "$PATCH_BIN"
