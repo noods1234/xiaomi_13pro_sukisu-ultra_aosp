@@ -76,15 +76,22 @@ See `docs/AUDIO_TIMECODE.md`.
 
 ## 7. External monitor behavior
 
-- **Clean HDMI/DP-Alt-Mode output**: unconfirmed on this hardware (`assumptions.md` A-5). If a certified USB-C→HDMI
-  adapter is confirmed working, OIWCamera runs a `Presentation`-based clean-feed activity on the external display
-  (no UI chrome) with a separate overlay-feed mode toggle (adds frame guides/LUT/false-color to the external output
-  too, for monitor-side confidence checks).
-- **UVC/USB-tether fallback**: if DP Alt Mode is unavailable, document use of a UVC-capable external capture path is
-  **not possible from the app's own encoder pipeline** (Android does not expose a generic "mirror this Surface to a
-  UVC gadget" API); the practical fallback is a wireless mirroring solution (Miracast-equivalent, if supported) or an
-  HDMI adapter, not a from-scratch UVC gadget driver (which would require kernel-level UVC gadget support we cannot
-  add — assumption A-3).
+- **Clean HDMI/DP-Alt-Mode output: CONFIRMED NOT POSSIBLE on this hardware** — the Xiaomi 13 Pro's USB-C port is
+  USB 2.0 with no DP Alt Mode wiring (`assumptions.md` A-5, verified against community sources 2026-07-06; the 13
+  Ultra was Xiaomi's first DP-alt-mode phone). This is a hardware limit, so instead of a dead end, the design ships
+  three real workarounds:
+- **UVC webcam-mode output (primary workaround, Path A):** AOSP 14+ includes **DeviceAsWebcam** — the phone
+  enumerates as a standard UVC webcam over its USB port. Any laptop, UVC field monitor, or capture-card-equipped
+  recorder then displays the feed. The Path A LineageOS build enables this (`DeviceAsWebcam` service); on stock
+  HyperOS it depends on Xiaomi having shipped the Android 14 webcam feature. Bandwidth is USB 2.0, so this is a
+  monitoring feed, not a clean 4K master — label it as such in the UI.
+- **scrcpy over USB (zero-install-on-phone workaround):** low-latency full-resolution mirroring to any host laptop
+  via ADB; works today on stock HyperOS, no root needed. Documented as the DIT-cart/video-village option.
+- **Wireless cast fallback:** Miracast/Google Cast mirroring where a receiver is available; highest latency of the
+  three, acceptable for director's-eyeline only, not focus judgment.
+- When any external feed is active, OIWCamera offers clean-feed vs overlay-feed framing via its `Presentation`
+  path where the display is an Android `Display` (cast), and via the preview-surface-only layout when the consumer
+  is UVC/scrcpy (which mirror the panel).
 - Display sleep is disabled (`FLAG_KEEP_SCREEN_ON`) during any active recording session, on both internal and mirrored
   external displays.
 - Notifications are suppressed system-wide during recording via `NotificationListenerService`-driven Do Not Disturb

@@ -117,7 +117,7 @@ built (Path D app-first + existing rooted kernel, not a full custom ROM).
 |---|---|---|---|---|---|
 | Claiming RAW video/CinemaDNG works when it doesn't | Medium (credibility/workflow risk) | N/A — explicitly marked blocked | N/A | `assumptions.md` C-3, `docs/CAMERA_PIPELINE.md` §3 | N/A |
 | Claiming ProRes support without a licensed encoder | Medium (legal/credibility) | N/A — explicitly not implemented | N/A | Documented external-recorder-only workflow | N/A |
-| Claiming DP Alt Mode monitor output works without testing | Medium | Medium if untested | Manual hardware test required | Marked "unconfirmed" until tested (`assumptions.md` A-5) | UI Tests external-monitor case |
+| Claiming DP Alt Mode monitor output works without testing | Medium | **Resolved** — confirmed via community sources that this model's port is USB 2.0 with no DP alt mode; docs/profiles corrected and three real workarounds shipped (DeviceAsWebcam UVC, scrcpy, cast) | N/A | `assumptions.md` A-5 (confirmed), `docs/CINEMA_FEATURES.md` §7 | UI Tests external-monitor case (now tests the UVC/scrcpy paths) |
 
 ## 16. Excessive scope creep
 

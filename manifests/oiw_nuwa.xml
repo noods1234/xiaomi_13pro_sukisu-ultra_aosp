@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OIW-ROM local manifest for a full LineageOS-based Path A build for Xiaomi 13 Pro (nuwa).
+
+  Every repository and branch below was individually VERIFIED to exist on 2026-07-06 by fetching the
+  repos and their lineage.dependencies files (see docs/DEVICE_BRINGUP.md §6 for the verification trail):
+
+    - LineageOS/android_device_xiaomi_nuwa            @ lineage-23.2  (official LineageOS org)
+    - lineage.dependencies of nuwa -> android_device_xiaomi_sm8550-common
+    - lineage.dependencies of sm8550-common -> hardware_xiaomi, kernel_xiaomi_sm8550,
+      kernel_xiaomi_sm8550-devicetrees, kernel_xiaomi_sm8550-modules
+    - TheMuppets/proprietary_vendor_xiaomi_nuwa       @ lineage-23.2  (extracted vendor blobs, git-lfs)
+    - TheMuppets/proprietary_vendor_xiaomi_sm8550-common @ lineage-23.2
+
+  The kernel repos are the community-maintained line of Xiaomi's own kernel source releases (Xiaomi
+  OSS drops + Qualcomm CLO tags, curated by LineageOS) — i.e. this IS "the Xiaomi kernel sources,"
+  just maintained where the work actually happens. Note kernel_xiaomi_sm8550-modules contains the
+  Qualcomm techpack sources (camera-kernel among them), so the KERNEL side of the camera stack builds
+  from source in this tree; the userspace camx/chi-cdk HAL remains a proprietary blob from TheMuppets.
+
+  Usage (from your LineageOS tree root):
+    mkdir -p .repo/local_manifests
+    cp /path/to/this/oiw_nuwa.xml .repo/local_manifests/
+    repo sync -j$(nproc) - -retry-fetches=3
+  (see tools/build_full_rom.sh for the full end-to-end flow, including the required git-lfs setup —
+   TheMuppets repos store blobs in LFS.)
+-->
+<manifest>
+  <!-- Device trees (official LineageOS) -->
+  <project name="LineageOS/android_device_xiaomi_nuwa"
+           path="device/xiaomi/nuwa" remote="github" revision="lineage-23.2" />
+  <project name="LineageOS/android_device_xiaomi_sm8550-common"
+           path="device/xiaomi/sm8550-common" remote="github" revision="lineage-23.2" />
+
+  <!-- Xiaomi hardware support libs -->
+  <project name="LineageOS/android_hardware_xiaomi"
+           path="hardware/xiaomi" remote="github" revision="lineage-23.2" />
+
+  <!-- Kernel: Xiaomi-derived sources, community-maintained (source-built kernel + techpack modules) -->
+  <project name="LineageOS/android_kernel_xiaomi_sm8550"
+           path="kernel/xiaomi/sm8550" remote="github" revision="lineage-23.2" />
+  <project name="LineageOS/android_kernel_xiaomi_sm8550-devicetrees"
+           path="kernel/xiaomi/sm8550-devicetrees" remote="github" revision="lineage-23.2" />
+  <project name="LineageOS/android_kernel_xiaomi_sm8550-modules"
+           path="kernel/xiaomi/sm8550-modules" remote="github" revision="lineage-23.2" />
+
+  <!-- Proprietary vendor blobs (TheMuppets community captures; requires git-lfs) -->
+  <project name="TheMuppets/proprietary_vendor_xiaomi_nuwa"
+           path="vendor/xiaomi/nuwa" remote="github" revision="lineage-23.2" />
+  <project name="TheMuppets/proprietary_vendor_xiaomi_sm8550-common"
+           path="vendor/xiaomi/sm8550-common" remote="github" revision="lineage-23.2" />
+
+  <!-- OIW cinema layer: this repo, mounted so vendor/oiw/oiw.mk and the apps are in-tree.
+       Optional; comment out if you prefer to sideload the OIW apps as ordinary APKs. -->
+  <project name="noods1234/xiaomi_13pro_sukisu-ultra_aosp"
+           path="vendor/oiw-rom" remote="github" revision="claude/oiw-cinema-rom-design-zf3zso" />
+</manifest>

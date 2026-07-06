@@ -43,8 +43,9 @@ a **Hybrid Vendor + App-First Cinema Layer** (see [`assumptions.md`](assumptions
 | Capture profiles / LUT index / button maps | **Implemented** (JSON) | D — App-first |
 | Field tooling (capability dump, storage/thermal benchmarks) | **Implemented** (scripts) | D — App-first |
 | OIW cinema kernel (flashable boot Image via CI) | **Verified & wired into CI** as the `nuwa-oiw` build variant — adds NTFS3/UDF footage-drive support + `-oiw-cinema` localversion; validated against real kernel source (`docs/BUILD_SYSTEM.md` §1). GKI limits mean the kernel can't change camera/ISP behavior. | B — Hybrid vendor (kernel) |
-| AOSP device tree / vendor tree / camera HAL rebuild | **Blocked** — Xiaomi has not published `nuwa` device/vendor source | A — Full custom ROM (blocked) |
-| RAW sensor video / CinemaDNG | **Unconfirmed on this hardware** — requires Tier-5/6 HAL access, see `docs/CAMERA_PIPELINE.md` | Unknown |
+| Full custom ROM (LineageOS 23.2 + OIW layer) | **UNBLOCKED — buildable.** Verified community device/vendor/kernel chain (official LineageOS `nuwa` trees + TheMuppets blobs); manifest + end-to-end build script shipped (`manifests/oiw_nuwa.xml`, `tools/build_full_rom.sh`). First compile requires a real build host (~400 GB disk) — user action. | A — Full custom ROM (primary track) |
+| RAW sensor video / CinemaDNG | **Research-possible under Path A** — kernel camera driver builds from source (`sm8550-modules` techpack); Lineage Camera2 typically exposes more than HyperOS. Verify with capability dump on the Lineage build. | A (research) |
+| External monitor (HDMI/DP) | **Hardware limit confirmed:** USB 2.0 port, no DP alt mode. Workarounds shipped: UVC webcam-mode (AOSP 14 DeviceAsWebcam, Path A), scrcpy over USB, wireless cast. | See `docs/CINEMA_FEATURES.md` §7 |
 
 ### ⚠️ Flashing and modification warnings
 

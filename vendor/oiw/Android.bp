@@ -1,0 +1,24 @@
+// OIW cinema apps as prebuilt modules for the Path A (full LineageOS) build.
+// Build the APKs first with Gradle and stage them into prebuilt/ —
+// tools/build_full_rom.sh --with-oiw-apps does both steps automatically.
+
+android_app_import {
+    name: "OIWCamera",
+    apk: "prebuilt/OIWCamera.apk",
+    presigned: true,
+    product_specific: true,
+    dex_preopt: {
+        enabled: false,
+    },
+}
+
+android_app_import {
+    name: "OIWLauncher",
+    apk: "prebuilt/OIWLauncher.apk",
+    presigned: true,
+    product_specific: true,
+    overrides: ["Launcher3", "Launcher3QuickStep", "TrebuchetQuickStep"],
+    dex_preopt: {
+        enabled: false,
+    },
+}

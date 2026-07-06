@@ -10,6 +10,13 @@ rather than trusting the SoC-tier assumption for a real shoot.
 
 ## 2. USB-C external SSD
 
+**Bandwidth reality (corrected 2026-07-06):** this device's USB-C port is **USB 2.0** (`assumptions.md` A-6), so
+sustained external writes realistically top out around **30–40 MB/s** — enough for ≤ ~200 Mbps recording with
+margin, not for 300 Mbps masters. The field workflow is therefore: **record high-bitrate to internal UFS 4.0, offload
+to SSD between takes**; record direct-to-SSD only on profiles at or below the measured drive+port speed. The
+preflight benchmark enforces measured speeds either way, and the OIW cinema kernel's NTFS3 support widens which
+drives can be offloaded to.
+
 Detected via `StorageManager.getStorageVolumes()` (public API, reports removable USB storage once mounted by the
 OS) — OIW-ROM does not implement its own USB mass-storage driver logic. If a volume isn't auto-mounted (exFAT
 support depends on the stock kernel/vendor build), the app surfaces "External storage not recognized — check

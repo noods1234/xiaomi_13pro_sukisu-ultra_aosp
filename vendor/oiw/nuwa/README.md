@@ -7,11 +7,15 @@ extract blobs *locally, from a device you own*, for your own local Path A experi
 proprietary blobs (camera HAL, ISP firmware, display/graphics, audio DSP images, sensor HAL, modem) are not licensed
 for redistribution. `extract-files.sh` writes its output to a gitignored local directory only.
 
-## Status
+## Status (updated 2026-07-06)
 
-Not currently needed for Path D (the path this project actually implements) — OIWCamera/OIWLauncher run entirely on
-public Android APIs against the stock, unmodified vendor partition. This directory exists for future Path A work
-only (see `device/oiw/nuwa/README.md`).
+**Largely superseded for Path A:** the community already maintains extracted, build-ready vendor blobs at
+`TheMuppets/proprietary_vendor_xiaomi_nuwa` + `proprietary_vendor_xiaomi_sm8550-common` (`lineage-23.2`, git-LFS),
+which `manifests/oiw_nuwa.xml` pulls directly — no local extraction needed for a normal full-ROM build.
+
+`extract-files.sh` remains useful for two narrower cases: (a) capturing blobs from **your unit's exact HyperOS
+version** when it diverges from TheMuppets' capture, and (b) auditing/diffing blob versions between firmware
+updates. Path D needs none of this — the apps run on public APIs against the stock vendor partition.
 
 ## Blob classes (for future Path A reference)
 

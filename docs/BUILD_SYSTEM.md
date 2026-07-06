@@ -1,7 +1,31 @@
 # OIW-ROM Build System
 
-OIW-ROM has **two independent build surfaces** — there is no unified AOSP `lunch`/`m` build graph because there is
-no AOSP device/vendor tree for `nuwa` (see `assumptions.md` A-3). This is intentional, not an oversight.
+OIW-ROM has **three build surfaces** (revised 2026-07-06 after `assumptions.md` A-3 was corrected):
+
+0. **Path A — full LineageOS-based ROM** (`brunch nuwa` with the OIW layer inherited), now unblocked;
+1. the CI-built **OIW cinema kernel** for users staying on rooted HyperOS (Path B);
+2. the **standalone Gradle apps** (Path D), which run identically on both.
+
+## 0. Full ROM build (Path A — LineageOS 23.2 base)
+
+Everything needed is in-repo and every upstream input was verified to exist (see `manifests/oiw_nuwa.xml` header
+for the verification trail, and `device/oiw/nuwa/README.md` for the dependency table):
+
+```sh
+# On a real build host: x86_64 Linux, ~400 GB free disk, 32 GB RAM recommended, git-lfs installed
+tools/build_full_rom.sh --tree ~/android/lineage --with-oiw-apps
+```
+
+The script performs: host preflight → `repo init -u LineageOS/android -b lineage-23.2 --git-lfs` → installs
+`manifests/oiw_nuwa.xml` as a local manifest (device trees, Xiaomi-derived kernel + techpack module sources,
+TheMuppets blobs) → `repo sync` → optionally Gradle-builds OIWCamera/OIWLauncher and stages them for
+`vendor/oiw/Android.bp`'s `android_app_import` modules → `brunch nuwa`. To bake the OIW layer into the image, add
+`$(call inherit-product-if-exists, vendor/oiw-rom/vendor/oiw/oiw.mk)` to `device/xiaomi/nuwa/lineage_nuwa.mk`
+(deliberately a one-line explicit operator step so the same tree can also produce a stock Lineage build).
+
+Git-LFS is mandatory — TheMuppets vendor repos store blobs in LFS; without it the vendor image is built from
+pointer files and fails. The compile itself takes hours and cannot run in this authoring environment; the manifest,
+build script, product makefiles, and app prebuilts wiring are the verified deliverables here.
 
 ## 1. Kernel build — the OIW cinema kernel (the one ROM-level artifact that IS rebuilt here)
 

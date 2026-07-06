@@ -96,9 +96,24 @@ have no code dependency — only a documentation cross-reference.
 - [ ] `docs/RED_TEAM_AUDIT.md` mitigations verified against real hardware behavior, not just design review.
 - [ ] Tag `oiw-rom-v0.1.0`.
 
-## Known unknowns blocking full completion (see `assumptions.md` for detail)
+## Phase 2A — Full ROM build (Path A, added 2026-07-06 after A-3 was corrected)
 
-1. Whether `RAW_SENSOR` is exposed on this device (A-7, C-3) — blocks Phase 3's RAW acceptance test until dumped.
-2. Whether USB-C DP Alt Mode / high-speed external SSD works on this exact unit (A-5, A-6) — blocks Phase 6/7
-   external-monitor and external-SSD acceptance tests until measured.
-3. Whether a `nuwa` AOSP device/vendor tree ever becomes available (A-3) — blocks re-evaluating Path A entirely.
+- [x] Verify the complete community device/vendor/kernel chain repo-by-repo (`device/oiw/nuwa/README.md` table).
+- [x] Ship `manifests/oiw_nuwa.xml` (verified local manifest incl. TheMuppets git-LFS blobs).
+- [x] Ship `tools/build_full_rom.sh` (init → sync → OIW app staging → `brunch nuwa`).
+- [x] Ship `vendor/oiw/oiw.mk` + `vendor/oiw/Android.bp` (OIW apps/configs baked into the image as
+      product-partition prebuilts; OIWLauncher overrides the stock launcher).
+- [ ] **User action (needs a ~400 GB build host):** run the script, add the one-line
+      `inherit-product-if-exists` to `lineage_nuwa.mk`, flash per the official Lineage install flow.
+- [ ] **User action:** run `tools/camera_capability_dump.py` on the Lineage build and diff against the HyperOS
+      dump — Lineage's Camera2 stack frequently exposes more (RAW, manual keys) than HyperOS.
+
+## Known unknowns / user actions remaining (see `assumptions.md` for detail)
+
+1. Whether `RAW_SENSOR` is exposed (A-7, C-3) — now testable on BOTH stock HyperOS and the Path A Lineage build;
+   the Lineage build is the more promising of the two.
+2. ~~DP Alt Mode~~ **resolved: hardware limit confirmed (USB 2.0 port)** — workarounds shipped
+   (DeviceAsWebcam UVC / scrcpy / cast, `docs/CINEMA_FEATURES.md` §7). External SSD bandwidth similarly capped —
+   profiles corrected (A-5/A-6).
+3. ~~Whether a `nuwa` device/vendor tree exists~~ **resolved: it exists and is verified** (A-3 corrected);
+   remaining unknown is only first-compile confirmation on a real build host.

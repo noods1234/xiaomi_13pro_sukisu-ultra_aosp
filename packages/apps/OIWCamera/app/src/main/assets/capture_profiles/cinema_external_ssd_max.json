@@ -10,7 +10,7 @@
   "tint": 0,
   "focusMode": "manual",
   "codec": "hevc10",
-  "bitrateBps": 300000000,
+  "bitrateBps": 160000000,
   "bitDepth": 10,
   "colorProfile": "flat_approximation",
   "lutId": "rec709_neutral_monitor",
