@@ -3,25 +3,55 @@
 OIW-ROM has **two independent build surfaces** — there is no unified AOSP `lunch`/`m` build graph because there is
 no AOSP device/vendor tree for `nuwa` (see `assumptions.md` A-3). This is intentional, not an oversight.
 
-## 1. Kernel build (existing, this repo)
+## 1. Kernel build — the OIW cinema kernel (the one ROM-level artifact that IS rebuilt here)
 
-Unchanged from the base project: GitHub Actions-driven, config-as-JSON under `Kernel/configs/*.config.json`.
-`nuwa-13.config.json` is the active config; `gki.config.json.stop`/`vermeer.config.json.stop` are disabled variants
-(the `.stop` suffix appears to gate them out of the active build matrix — do not rename without confirming the
-workflow's file-glob behavior first).
+GitHub Actions-driven (`.github/workflows/SukiSU_SUSFS.yml`), config-as-JSON under `Kernel/configs/*.config.json`.
+The workflow reads **every** `*.config.json` as a build-matrix entry (via `jq -s '[.[][]]'`), clones
+`crdroidandroid/android_kernel_xiaomi_sm8550@15.0`, applies SukiSU Ultra + SUSFS + KPM, builds a flashable
+AnyKernel3 zip and boot `Image`. `.stop`-suffixed files are excluded by the `*.config.json` glob.
 
-**OIW addition**: `kernel/oiw/nuwa/configs/oiw_camera_media.config` is a `CONFIG_*` fragment intended to be merged
-into the `gki_defconfig` build step. To apply it manually against a local checkout of the upstream kernel source
-(`crdroidandroid/android_kernel_xiaomi_sm8550`, branch `15.0`):
+### The `nuwa-oiw` cinema kernel variant
+
+`Kernel/configs/nuwa-oiw.config.json` adds a **dedicated OIW cinema kernel build** alongside the untouched stock
+`nuwa-13.config.json`. It carries one extra field, `oiwCinemaFragment`, pointing at
+`kernel/oiw/nuwa/configs/oiw_cinema.config`. A gated workflow step (`🎬 Inject OIW cinema kernel tuning`) appends
+that fragment's `CONFIG_*` lines to `gki_defconfig` during the build — mirroring exactly how the workflow already
+injects the SUSFS/KPM configs. The stock `nuwa-13` build has no `oiwCinemaFragment` field, so the step is skipped
+for it and it is left byte-for-byte unchanged.
+
+### What the fragment actually does (verified, and honest about GKI limits)
+
+This is a **GKI (Generic Kernel Image)** build: camera/ISP/sensor drivers are proprietary vendor kernel modules
+loaded from the stock vendor partition, **not** part of this Image. So the kernel cannot change camera/RAW/log/ISP
+behavior — that is architecturally impossible at this layer (see `docs/ARCHITECTURE.md` §3). The genuinely useful,
+GKI-legal, currently-missing delta is **broader external-footage-drive filesystem support**:
+
+- `CONFIG_NTFS3_FS` (+ `NTFS3_LZX_XPRESS`, `NTFS3_FS_POSIX_ACL`) — read/write NTFS footage drives from
+  Windows/macOS editors.
+- `CONFIG_UDF_FS` — UDF-formatted media breadth.
+- `CONFIG_LOCALVERSION="-oiw-cinema"` — makes the flashed cinema kernel identifiable in build metadata.
+
+Everything else a camera project might reflexively add (USB_UAS/USB_STORAGE/EXFAT/F2FS/EXT4/DMABUF_HEAPS/THERMAL*/
+TYPEC*/V4L_PLATFORM_DRIVERS) was **verified already enabled** in the stock `gki_defconfig` and is deliberately not
+re-added.
+
+### Verification performed in this change (not a claim — actually run)
+
+Against a real shallow clone of `crdroidandroid/android_kernel_xiaomi_sm8550@15.0`, the fragment was appended to
+`gki_defconfig` and the real kernel kconfig was generated:
 
 ```sh
-git clone --branch 15.0 https://github.com/crdroidandroid/android_kernel_xiaomi_sm8550.git
+git clone --depth=1 --branch 15.0 https://github.com/crdroidandroid/android_kernel_xiaomi_sm8550.git
 cd android_kernel_xiaomi_sm8550
-ARCH=arm64 scripts/kconfig/merge_config.sh arch/arm64/configs/gki_defconfig \
-    /path/to/kernel/oiw/nuwa/configs/oiw_camera_media.config
+# (CI's SukiSU step creates drivers/kernelsu; stub it for a local config-only check)
+cat /path/to/kernel/oiw/nuwa/configs/oiw_cinema.config | grep '^CONFIG_' >> arch/arm64/configs/gki_defconfig
+make ARCH=arm64 O=out gki_defconfig
+grep -E 'NTFS3_FS|UDF_FS|LOCALVERSION="-oiw' out/.config   # confirmed present
 ```
-Then build per that kernel's own instructions. This has **not** been run/verified in this change (no kernel source
-checked out here) — treat it as an unverified patch until a build is attempted (`implementation_plan.md` Phase 2).
+
+`NTFS3_FS=y`, `NTFS3_LZX_XPRESS=y`, `NTFS3_FS_POSIX_ACL=y`, `UDF_FS=y`, and `LOCALVERSION="-oiw-cinema"` were all
+confirmed to survive into the generated `.config`. The full compile (ARM Clang `r536225`, thin-LTO) is what the CI
+does on `workflow_dispatch`; it is not run in this environment, but the config wiring it consumes is verified.
 
 ## 2. Host dependencies (app build)
 

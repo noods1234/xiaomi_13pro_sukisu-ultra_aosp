@@ -1,30 +1,39 @@
-# kernel/oiw/nuwa — OIW kernel integration plan
+# kernel/oiw/nuwa — OIW cinema kernel integration
 
-This directory documents (and stages) the kernel-level changes OIW-ROM wants layered onto the existing SukiSU Ultra
-GKI build defined by `Kernel/configs/nuwa-13.config.json`. **Nothing here is applied automatically by that build's
-CI today** — see `docs/BUILD_SYSTEM.md` §1 for how to apply it manually, and `implementation_plan.md` Phase 2 for
-the tracked follow-up to wire it into CI.
+This is the kernel-level layer of OIW-ROM, and it is the **one ROM-level artifact this project actually
+rebuilds**: a flashable boot `Image` produced by this repo's existing GitHub Actions CI. Everything else in
+OIW-ROM (OIWCamera/OIWLauncher) is userspace running on the stock system image, which cannot be rebuilt without a
+vendor tree (see `docs/ARCHITECTURE.md` §2).
 
-## Why config fragments, not patches, for most of this
+## What ships here
 
-The upstream kernel source (`crdroidandroid/android_kernel_xiaomi_sm8550`, branch `15.0`) is not checked out in this
-repo — this repo only holds the *build recipe* (JSON) that tells the external CI where to fetch it. We therefore
-cannot safely hand-author line-level source patches against code we can't see and diff against. What we *can* do
-responsibly is provide a `CONFIG_*` fragment (a standard `merge_config.sh`-compatible file) — these are additive,
-order-independent, and safe to review without the full source tree, since they only turn on/off/parameterize
-existing Kconfig options that a modern SM8550 GKI kernel is expected to already define.
+- `configs/oiw_cinema.config` — a **verified** GKI defconfig delta. It adds NTFS3/UDF external-footage-drive
+  filesystem support and a `-oiw-cinema` localversion, and nothing else, because on a GKI build that is the only
+  genuinely useful, currently-missing, kernel-legal cinema change (full reasoning in the file header and
+  `docs/BUILD_SYSTEM.md` §1).
 
-## Contents
+## How it's wired into the build (not a stub anymore)
 
-- `configs/oiw_camera_media.config` — camera/media/USB-storage/thermal-adjacent Kconfig fragment (see file for the
-  full option list and rationale per option).
-- `patch-queue/0000-README.md` — layout convention for any future source-level patches, once/if this repo starts
-  vendoring the kernel source directly instead of fetching it in CI.
+`Kernel/configs/nuwa-oiw.config.json` declares a dedicated `nuwa-oiw-cinema` build-matrix entry with an
+`oiwCinemaFragment` field pointing at `configs/oiw_cinema.config`. The `🎬 Inject OIW cinema kernel tuning` step in
+`.github/workflows/SukiSU_SUSFS.yml` appends the fragment to `gki_defconfig` during that build (and only that
+build — the stock `nuwa-13` build has no such field and is untouched). Trigger it via the workflow's
+`workflow_dispatch`; the artifact is `AnyKernel3-nuwa-oiw-cinema-...zip`, flashable like any AnyKernel3 zip.
 
-## Scope boundaries (explicit)
+## Verification status
 
-- This fragment does **not** touch the camera sensor driver itself (proprietary, vendor-module-loaded — see
-  `assumptions.md` A-3) — it only affects the generic media/V4L2/DMA-BUF/USB-storage/thermal subsystems that a GKI
-  kernel controls independently of the vendor camera module.
-- This fragment does **not** change default CPU/GPU governors (see `docs/THERMAL_POWER.md` §2 — that's handled at
-  the app layer intentionally, to avoid shipping an unreviewed systemwide governor change).
+**Verified**, not aspirational. The fragment was appended to a real clone of
+`crdroidandroid/android_kernel_xiaomi_sm8550@15.0` and `make ARCH=arm64 gki_defconfig` was run; `NTFS3_FS`,
+`NTFS3_LZX_XPRESS`, `NTFS3_FS_POSIX_ACL`, `UDF_FS`, and the `-oiw-cinema` localversion were all confirmed present in
+the generated `.config` (`docs/BUILD_SYSTEM.md` §1 has the exact commands). The final ARM compile happens in CI.
+
+## Honest scope boundary
+
+- Does **not** touch the camera sensor driver, ISP, or any camera/RAW/log behavior — those are proprietary vendor
+  kernel modules loaded from the stock vendor partition, not part of this GKI Image (`assumptions.md` A-3).
+- Does **not** change CPU/GPU governors — that stays at the app layer intentionally (`docs/THERMAL_POWER.md` §2).
+
+## patch-queue/
+
+`patch-queue/0000-README.md` — layout convention for future source-level patches, unused today because the kernel
+source is fetched by CI rather than vendored in this repo.

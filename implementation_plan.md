@@ -26,12 +26,16 @@ have no code dependency — only a documentation cross-reference.
 ## Phase 2 — Build base
 
 - [x] Confirm existing kernel CI (`Kernel/configs/nuwa-13.config.json`) builds a flashable SukiSU Ultra boot image
-      (pre-existing, out of OIW-ROM's scope to change).
-- [ ] Add `kernel/oiw/nuwa/configs/oiw_camera_media.config` as an additional `CONFIG_*` fragment consumed by that CI
-      (requires editing the upstream build's defconfig merge step — tracked as a follow-up PR against the CI, not
-      done in this change since the CI definition lives outside this repo's visible files).
-- Acceptance: kernel CI still produces a bootable, flashable image with the fragment merged; `dmesg` shows no new
-  probe failures versus baseline.
+      (pre-existing; left byte-for-byte untouched).
+- [x] Add the **verified** cinema kernel delta `kernel/oiw/nuwa/configs/oiw_cinema.config` and wire it into CI as a
+      dedicated `nuwa-oiw` build-matrix variant (`Kernel/configs/nuwa-oiw.config.json`) plus a gated
+      `Inject OIW cinema kernel tuning` step in `.github/workflows/SukiSU_SUSFS.yml`. Verified locally against real
+      source that `NTFS3_FS`/`UDF_FS`/`-oiw-cinema` survive `make gki_defconfig` (`docs/BUILD_SYSTEM.md` §1).
+- [ ] **User action:** trigger the `SukiSU_SUSFS` workflow (`workflow_dispatch`), confirm the `nuwa-oiw-cinema`
+      AnyKernel3 artifact builds, flash it, and verify `uname -r` shows `-oiw-cinema` and an NTFS-formatted external
+      SSD mounts read/write.
+- Acceptance: cinema kernel CI produces a bootable, flashable image; `dmesg` shows no new probe failures versus the
+  stock `nuwa-13` baseline.
 
 ## Phase 3 — Camera viability
 

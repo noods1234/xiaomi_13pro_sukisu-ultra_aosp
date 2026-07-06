@@ -342,7 +342,31 @@ jobs:
           sed -i 's/-dirty//' scripts/setlocalversion
           echo 'CONFIG_LOCALVERSION="-giang@techs.review"' >> "$CONFIG_FILE"
           echo "CONFIG_LOCALVERSION_AUTO=y" >> "$CONFIG_FILE"
-          
+
+      # OIW-ROM: inject the verified cinema kernel tuning fragment (NTFS3/UDF footage-drive support,
+      # cinema localversion) into the defconfig. Only runs for build-matrix entries that declare an
+      # "oiwCinemaFragment" path in their *.config.json (e.g. nuwa-oiw.config.json); the stock
+      # nuwa-13 build has no such field and is left untouched. Runs AFTER "Add Custom Kernel Name"
+      # so the fragment's CONFIG_LOCALVERSION wins (kconfig last-assignment-wins). See the fragment
+      # header + docs/BUILD_SYSTEM.md #1 for the verification method.
+      - name: 🎬 Inject OIW cinema kernel tuning
+        env:
+          ARCH: ${{ steps.generate-args.outputs.ARCH }}
+          OIW_FRAGMENT: ${{ matrix.CONFIG.oiwCinemaFragment }}
+        if: ${{ matrix.CONFIG.oiwCinemaFragment != '' && matrix.CONFIG.oiwCinemaFragment != null }}
+        run: |
+          CONFIG_FILE="${{ env.WORKSPACE }}/${{ env.KERNEL_NAME }}/arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}"
+          FRAGMENT_FILE="${{ env.WORKSPACE }}/${{ env.OIW_FRAGMENT }}"
+          if [ ! -f "$FRAGMENT_FILE" ]; then
+            echo "::error::OIW cinema fragment not found at $FRAGMENT_FILE"
+            exit 1
+          fi
+          echo "🎬 Appending OIW cinema fragment ($OIW_FRAGMENT) to $CONFIG_FILE"
+          # Only append real CONFIG_ assignment lines; ignore comments/blank lines in the fragment.
+          grep -E '^CONFIG_' "$FRAGMENT_FILE" >> "$CONFIG_FILE"
+          echo "---- OIW cinema lines now in defconfig: ----"
+          grep -E 'NTFS3|UDF_FS|LOCALVERSION="-oiw' "$CONFIG_FILE" || true
+
       - name: 😋 Setup LXC docker
         working-directory: ${{ env.KERNEL_NAME }}
         env:

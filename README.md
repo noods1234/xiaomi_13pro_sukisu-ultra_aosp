@@ -42,7 +42,7 @@ a **Hybrid Vendor + App-First Cinema Layer** (see [`assumptions.md`](assumptions
 | OIWLauncher (camera-first launcher) | **Skeleton implemented** | D — App-first |
 | Capture profiles / LUT index / button maps | **Implemented** (JSON) | D — App-first |
 | Field tooling (capability dump, storage/thermal benchmarks) | **Implemented** (scripts) | D — App-first |
-| Kernel-level camera/media/thermal/storage config fragment | **Documented, not yet merged upstream** (no nuwa kernel source available) | Blocked — see assumptions.md A-1 |
+| OIW cinema kernel (flashable boot Image via CI) | **Verified & wired into CI** as the `nuwa-oiw` build variant — adds NTFS3/UDF footage-drive support + `-oiw-cinema` localversion; validated against real kernel source (`docs/BUILD_SYSTEM.md` §1). GKI limits mean the kernel can't change camera/ISP behavior. | B — Hybrid vendor (kernel) |
 | AOSP device tree / vendor tree / camera HAL rebuild | **Blocked** — Xiaomi has not published `nuwa` device/vendor source | A — Full custom ROM (blocked) |
 | RAW sensor video / CinemaDNG | **Unconfirmed on this hardware** — requires Tier-5/6 HAL access, see `docs/CAMERA_PIPELINE.md` | Unknown |
 
