@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OIW-ROM Capture Profile",
+  "type": "object",
+  "required": [
+    "id", "displayName", "resolution", "frameRateFps", "shutter", "isoMin", "isoMax",
+    "whiteBalanceKelvin", "focusMode", "codec", "bitrateBps", "colorProfile",
+    "storageTarget", "thermalProfileId"
+  ],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "displayName": { "type": "string" },
+    "resolution": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "frameRateFps": { "type": "integer", "minimum": 1, "maximum": 240 },
+    "shutter": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["angle", "speed_fraction"] },
+        "shutterAngleDegrees": { "type": "number", "minimum": 1, "maximum": 360 },
+        "shutterSpeedDenominator": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "isoMin": { "type": "integer", "minimum": 1 },
+    "isoMax": { "type": "integer", "minimum": 1 },
+    "whiteBalanceKelvin": { "type": "integer", "minimum": 2000, "maximum": 10000 },
+    "tint": { "type": "integer", "minimum": -100, "maximum": 100 },
+    "focusMode": { "type": "string", "enum": ["manual", "continuous_locked_on_start"] },
+    "codec": { "type": "string", "enum": ["hevc", "hevc10", "avc"] },
+    "bitrateBps": { "type": "integer", "minimum": 1000000 },
+    "bitDepth": { "type": "integer", "enum": [8, 10] },
+    "colorProfile": {
+      "type": "string",
+      "enum": ["standard", "flat_approximation", "vendor_log_if_available"]
+    },
+    "lutId": { "type": ["string", "null"] },
+    "stabilization": { "type": "string", "enum": ["off", "eis", "ois_if_available"] },
+    "audioSource": {
+      "type": "string",
+      "enum": ["internal_mic", "usb_audio", "usb_c_mic", "external_recorder_sync_only"]
+    },
+    "storageTarget": { "type": "string", "enum": ["internal", "external_ssd"] },
+    "thermalProfileId": {
+      "type": "string",
+      "enum": [
+        "max_quality_short_take", "balanced_field", "long_take_safe",
+        "external_cooling", "charging_safe", "stealth_low_heat", "debug_unrestricted"
+      ]
+    },
+    "monitoringOverlays": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "histogram", "zebra", "focus_peaking", "false_color", "lut_preview",
+          "frame_guides", "anamorphic_desqueeze", "audio_meters", "timecode"
+        ]
+      }
+    },
+    "lensMetadataDefaults": {
+      "type": "object",
+      "properties": {
+        "lensName": { "type": "string" },
+        "focalLengthMm": { "type": "number" },
+        "aperture": { "type": "string" },
+        "adapter": { "type": "string" },
+        "speedBoosterFactor": { "type": "number" },
+        "anamorphicSqueeze": { "type": "number" },
+        "ndValue": { "type": "string" }
+      }
+    },
+    "buttonMappingId": { "type": "string" }
+  }
+}

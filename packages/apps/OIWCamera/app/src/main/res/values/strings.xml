@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OIWCamera</string>
+    <string name="status_bar_placeholder">-- · -- fps · -- · -- Mbps · storage: -- · thermal: --</string>
+    <string name="record_button">REC</string>
+    <string name="still_button">STILL</string>
+    <string name="profile_button">PROFILE</string>
+</resources>

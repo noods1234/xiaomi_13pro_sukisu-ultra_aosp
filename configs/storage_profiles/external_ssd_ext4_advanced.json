@@ -1,0 +1,11 @@
+{
+  "id": "external_ssd_ext4_advanced",
+  "displayName": "External SSD (ext4, advanced/rooted workflows)",
+  "target": "external_ssd",
+  "recommendedFilesystem": "ext4",
+  "segmentSizeBytes": 4294967296,
+  "segmentDurationSeconds": 600,
+  "safetyMarginMultiplier": 1.2,
+  "requireBenchmarkBeforeFirstUse": true,
+  "notes": "Requires a rooted mount helper or desktop-side ext4 reader for macOS/Windows editors, docs/STORAGE_MEDIA.md #3. Not the default."
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OIW-ROM LUT Index",
+  "type": "object",
+  "required": ["luts"],
+  "properties": {
+    "luts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "displayName", "path", "size", "intendedUse"],
+        "properties": {
+          "id": { "type": "string" },
+          "displayName": { "type": "string" },
+          "path": { "type": "string", "description": "relative path under configs/lut/ or /sdcard/OIW_MEDIA/LUTs/" },
+          "size": { "type": "integer", "enum": [17, 33, 65] },
+          "intendedUse": { "type": "string", "enum": ["technical", "creative", "desqueeze_neutral"] },
+          "sourceNotes": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "cinema_low_light",
+  "displayName": "Cinema Low Light",
+  "resolution": { "width": 3840, "height": 2160 },
+  "frameRateFps": 24,
+  "shutter": { "mode": "angle", "shutterAngleDegrees": 172.8 },
+  "isoMin": 800,
+  "isoMax": 12800,
+  "whiteBalanceKelvin": 3200,
+  "tint": 0,
+  "focusMode": "manual",
+  "codec": "hevc",
+  "bitrateBps": 120000000,
+  "bitDepth": 8,
+  "colorProfile": "standard",
+  "lutId": null,
+  "stabilization": "eis",
+  "audioSource": "internal_mic",
+  "storageTarget": "internal",
+  "thermalProfileId": "balanced_field",
+  "monitoringOverlays": ["histogram", "zebra"],
+  "buttonMappingId": "default"
+}

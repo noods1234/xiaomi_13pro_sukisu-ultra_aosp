@@ -1,0 +1,12 @@
+{
+  "id": "external_cooling",
+  "displayName": "External Cooling",
+  "warningThermalStatus": "SEVERE",
+  "forcedStopThermalStatus": "CRITICAL",
+  "displayBrightnessCapPercent": 100,
+  "backgroundServicesForegroundOnly": true,
+  "radiosForcedOff": [],
+  "chargingWarning": false,
+  "loggingLevel": "verbose",
+  "notes": "Assumes an effective cooling accessory is attached; detection is via thermal-trend inference only (docs/THERMAL_POWER.md #6), not accessory-specific sensing."
+}

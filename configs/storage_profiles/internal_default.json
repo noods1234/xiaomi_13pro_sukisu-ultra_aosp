@@ -1,0 +1,10 @@
+{
+  "id": "internal_default",
+  "displayName": "Internal Storage (default)",
+  "target": "internal",
+  "rootPath": "/sdcard/OIW_MEDIA",
+  "segmentSizeBytes": 4294967296,
+  "segmentDurationSeconds": 600,
+  "safetyMarginMultiplier": 1.2,
+  "requireBenchmarkBeforeFirstUse": true
+}

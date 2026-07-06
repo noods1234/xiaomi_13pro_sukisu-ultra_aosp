@@ -1,0 +1,25 @@
+# proprietary-files.txt — template manifest for vendor/oiw/nuwa/extract-files.sh
+#
+# One device-absolute path per line. This is a TEMPLATE with placeholder example paths based on typical
+# Qualcomm SM8550 vendor partition layouts — every path below must be verified against a real `nuwa` unit
+# (`adb shell su -c 'find /vendor -iname "*camx*"'` etc.) before use. Do not trust these paths blindly.
+#
+# Camera HAL (class: camera, redistributable: no)
+/vendor/lib64/libcamxdevice.so
+/vendor/lib64/libcamximaging.so
+/vendor/lib64/hw/camera.qcom.so
+/vendor/lib64/hw/android.hardware.camera.provider@2.7-service_64.so
+
+# Display/graphics (class: display, redistributable: no)
+/vendor/lib64/hw/gralloc.qti.so
+/vendor/lib64/libdisplayconfig.qti.so
+
+# Audio (class: audio, redistributable: no)
+/vendor/lib64/libagm.so
+/vendor/etc/audio_platform_info.xml
+
+# Sensors (class: sensors, redistributable: no)
+/vendor/lib64/hw/sensors.qti.so
+
+# Thermal/power (class: thermal, redistributable: no)
+/vendor/etc/thermal-engine.conf

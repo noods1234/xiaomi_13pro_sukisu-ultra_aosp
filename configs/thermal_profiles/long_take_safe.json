@@ -1,0 +1,13 @@
+{
+  "id": "long_take_safe",
+  "displayName": "Long Take Safe",
+  "warningThermalStatus": "LIGHT",
+  "forcedStopThermalStatus": "MODERATE",
+  "displayBrightnessCapPercent": 40,
+  "displayDimAfterMinutes": 5,
+  "backgroundServicesForegroundOnly": true,
+  "radiosForcedOff": ["wifi", "bluetooth", "cellular_suggested"],
+  "chargingWarning": true,
+  "chargingWarningStrong": true,
+  "loggingLevel": "info"
+}

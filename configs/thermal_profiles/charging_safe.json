@@ -1,0 +1,12 @@
+{
+  "id": "charging_safe",
+  "displayName": "Charging Safe",
+  "warningThermalStatus": "MODERATE",
+  "forcedStopThermalStatus": "SEVERE",
+  "displayBrightnessCapPercent": 50,
+  "backgroundServicesForegroundOnly": true,
+  "radiosForcedOff": ["wifi", "bluetooth"],
+  "chargingWarning": false,
+  "notes": "Charging is expected/allowed by definition of this mode.",
+  "loggingLevel": "info"
+}

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:name="android.hardware.camera.any" android:required="true" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Local-only external control socket (docs/API_PLUGIN_FRAMEWORK.md #4); not used for any WAN traffic. -->
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.OIWCamera"
+        android:hardwareAccelerated="true">
+
+        <activity
+            android:name=".ui.CameraActivity"
+            android:exported="true"
+            android:screenOrientation="locked"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Allows OIWLauncher (packages/apps/OIWLauncher) to boot straight into capture. -->
+            <intent-filter>
+                <action android:name="com.oiw.launcher.action.LAUNCH_CAMERA" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".record.RecordingService"
+            android:foregroundServiceType="camera|microphone"
+            android:exported="false" />
+
+    </application>
+</manifest>

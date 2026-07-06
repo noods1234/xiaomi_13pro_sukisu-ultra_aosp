@@ -1,0 +1,10 @@
+{
+  "id": "release_quiet",
+  "displayName": "Release Quiet",
+  "loggingLevel": "warn_error_only",
+  "debugPanelUnlocked": false,
+  "debugPanelUnlockGesture": "seven_tap_settings",
+  "showRawCaptureResultEcho": false,
+  "showVendorTagDump": false,
+  "keepLogsDays": 2
+}

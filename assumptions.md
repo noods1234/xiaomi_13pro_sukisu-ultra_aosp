@@ -1,0 +1,49 @@
+# OIW-ROM Assumption Register
+
+Every assumption made while designing and implementing One Inch Wonder (OIW-ROM), why it was made, how confident we
+are, what happens if it's wrong, and what you must confirm on real hardware before trusting a capture.
+
+Confidence: **High** (verified from repo/public source), **Medium** (industry-standard but device-unverified),
+**Low** (best guess, must be verified before field use).
+
+## A. Hardware & firmware identity
+
+| ID | Assumption | Confidence | Risk if wrong | User must confirm |
+|---|---|---|---|---|
+| A-1 | Target device is Xiaomi 13 Pro, codename `nuwa`, SoC Snapdragon 8 Gen 2 (SM8550), main camera Sony IMX989 1"-type sensor (Camera ID likely `0`, but not guaranteed). | High (matches this repo's `Kernel/configs/nuwa-13.config.json` and public device specs) | Wrong sensor assumptions invalidate crop-factor/DNG/RAW claims in `docs/CAMERA_PIPELINE.md`. | Run `tools/camera_capability_dump.py` on your unit and diff against `docs/CAMERA_PIPELINE.md` §1 before trusting any capture profile. |
+| A-2 | Device runs stock **HyperOS** (MIUI-derived), not a custom AOSP/LineageOS build — this repo's README states the kernel "only works on HyperOS roms." | High (stated in this repo's existing README) | Any framework-level assumption (launcher replacement mechanics, camera provider behavior, SELinux domains) may differ on a different base ROM. | Confirm HyperOS version/Android version (`adb shell getprop ro.build.version.release`, `ro.mi.os.version.code`) before applying thermal/SELinux guidance. |
+| A-3 | Xiaomi has **not published** an AOSP-buildable device tree, vendor tree, or full mainline-mergeable kernel source for `nuwa`. The only source basis available is the community `crdroidandroid/android_kernel_xiaomi_sm8550` GKI source referenced in `Kernel/configs/nuwa-13.config.json`. | High (this repo's own build config uses that source, not an official Xiaomi tree; no official `nuwa` branch exists in the paired `xiaomi_kernel_opensource` multi-device repo) | If a real `nuwa` device/vendor tree ever surfaces, Path A (Full Custom ROM) becomes tractable and should be re-evaluated. | Check `noods1234/xiaomi_kernel_opensource` branch list periodically for a `nuwa-*-oss` branch. |
+| A-4 | Bootloader is unlocked (required to flash the custom SukiSU Ultra boot image at all). | High (structural prerequisite of the base project) | If locked, none of this applies; device stays fully stock. | Confirm via `fastboot flashing get_unlock_ability` / `fastboot oem device-info`. |
+| A-5 | USB-C on this unit does **not** expose DisplayPort Alt Mode or guaranteed UVC video-out (Xiaomi has not documented DP Alt Mode support for this model). | Low | Clean HDMI/DP monitoring may be unavailable; must fall back to Wi-Fi mirroring or a UVC capture dongle, which itself may not be supported by the sensor pipeline. | Test directly with a certified USB-C-to-HDMI DP-Alt-Mode cable and a known-good monitor; log result in `docs/CINEMA_FEATURES.md` §5. |
+| A-6 | USB-C supports USB Mass Storage / exFAT external SSDs at USB 3.x speeds (common on this SoC tier, not confirmed for this exact unit's USB controller wiring). | Medium | High-bitrate external-SSD profiles may be throttled to USB 2.0 speeds; storage preflight (`tools/storage_benchmark.sh`) will catch this at runtime regardless. | Run `tools/storage_benchmark.sh` with your actual SSD/enclosure before enabling `cinema_external_ssd_max.json`. |
+| A-7 | Camera2 `INFO_SUPPORTED_HARDWARE_LEVEL` is at least `LIMITED`, and `RAW_SENSOR` capability is **not guaranteed** — flagship Xiaomi devices historically gate RAW capture behind vendor camera app / vendor HAL extensions rather than exposing it through stock Camera2. | Low | RAW/DNG capture paths in `docs/CAMERA_PIPELINE.md` §3 may be unavailable through Camera2; falls back to log/high-bitrate YUV path. | Run `tools/camera_capability_dump.py`; check `availableCapabilities` for `RAW`. |
+| A-8 | No physical dedicated shutter button exists on this model; volume rocker is the only reliable physical input for remapping. | Medium | Button-mapping defaults in `configs/button_mappings/default.json` may need adjustment for a future hardware revision with more buttons. | Confirm physical button inventory during device bring-up. |
+
+## B. Build system & path selection
+
+| ID | Assumption | Confidence | Risk if wrong | User must confirm |
+|---|---|---|---|---|
+| B-1 | Given A-3, **Path A (Full Custom ROM)** is not currently buildable: there is no legally-obtainable `nuwa` device/vendor tree to compile AOSP/LineageOS against. OIW-ROM is therefore implemented as **Path D (App-First Cinema Layer)** running on stock HyperOS + the existing rooted SukiSU Ultra GKI kernel, with **Path B (Hybrid Vendor ROM Modification)** enabled opportunistically through root (Magisk/KernelSU modules, systemless overlays). | High (direct consequence of A-3) | If this changes, re-run the path-selection matrix in `docs/ARCHITECTURE.md` §2. | — |
+| B-2 | Kernel-level OIW changes (thermal governor tuning, extra V4L2/media/ION config, USB mass-storage/exFAT config) are documented as a **patch/config-fragment queue** against the `crdroidandroid/android_kernel_xiaomi_sm8550` source, not applied in this repo, because that kernel source is not checked out here (it is pulled by the existing CI at build time per `Kernel/configs/nuwa-13.config.json`). | High | Fragments in `kernel/oiw/nuwa/` are unverified against the actual kernel source tree until applied and build-tested in that CI. | Apply `kernel/oiw/nuwa/configs/oiw_camera_media.config` as a `CONFIG_*` fragment in the next kernel build and confirm it compiles. |
+| B-3 | The existing GitHub Actions-driven build (JSON configs under `Kernel/configs/`) is the only CI/build automation present in this repo; there is no Soong/Make-based AOSP build graph to hook `packages/apps/*` into. | High (confirmed by repo inspection) | `device/`, `vendor/` scaffolding cannot be compiled as part of a ROM build today — they are templates for a future Path A effort. | — |
+| B-4 | `packages/apps/OIWCamera` and `packages/apps/OIWLauncher` are standalone Gradle/Kotlin Android app projects (installable via `adb install` or Magisk/APK overlay), **not** `Android.bp`/`Android.mk` modules inside an AOSP tree. | High (necessary consequence of B-3) | If OIW-ROM later moves to Path A, these should be re-packaged as system apps with `Android.bp` and signed with platform keys. | — |
+
+## C. Feature-level assumptions
+
+| ID | Assumption | Confidence | Risk if wrong | User must confirm |
+|---|---|---|---|---|
+| C-1 | Manual exposure/ISO/WB/focus control is reachable through public `android.hardware.camera2` `CaptureRequest` keys (`SENSOR_EXPOSURE_TIME`, `SENSOR_SENSITIVITY`, `CONTROL_AWB_MODE`/`COLOR_CORRECTION_GAINS`, `LENS_FOCUS_DISTANCE`) without needing vendor-private tags. | Medium | Some controls may be clamped by vendor camera HAL even when Camera2 reports a supported range; this is exactly why `docs/CAMERA_PIPELINE.md` defines HAL access Tiers 1–6 and requires the capability dump before trusting a profile. | Verify each control by watching `TotalCaptureResult` echo the requested value during MVP bring-up (`docs/TEST_PLAN.md` §Camera Tests). |
+| C-2 | Vendor log/flat color profiles (e.g., a MIUI/HyperOS-specific "log" picture profile) are **not confirmed to exist** in the stock camera vendor tags for this device. | Low | The "log profile" capture profiles ship a software flat-curve **approximation** (tone-map + reduced contrast LUT preview), clearly labeled as such, not a true sensor log curve. | Run the vendor tag dumper (`tools/camera_capability_dump.py --vendor-tags`) and check for any `com.xiaomi.*` or `com.qti.*` log/gamma vendor tags. |
+| C-3 | RAW video / CinemaDNG sequences are very unlikely to be exposed through any public API on this device generation and are treated as an **unresolved research path**, not a shipped feature. | Medium-High (industry-wide constraint, not device-specific) | None — this is conservative by design per the "do not fake RAW support" constraint. | Re-check if a future HyperOS/vendor update exposes `RAW_SENSOR` in `availableCapabilities`. |
+| C-4 | Bluetooth audio (A2DP/LE Audio) is unsuitable for sync-critical capture due to variable codec latency, and is explicitly excluded as a capture audio source (monitoring-only, clearly labeled). | High (general Bluetooth audio-latency behavior, industry-documented) | N/A — conservative default. | — |
+| C-5 | The device's internal storage uses F2FS or ext4 (Xiaomi HyperOS default) and can be safely read via standard Android `MediaStore`/`File` APIs from a non-system app without root for the `/sdcard/OIW_MEDIA` project tree; root (already present via SukiSU Ultra) is only needed for thermal-zone reads and kernel config work, not basic recording. | Medium | If scoped storage restrictions are tighter than assumed, `MANAGE_EXTERNAL_STORAGE` permission handling in `OIWCamera` must be verified on the actual HyperOS version. | Test on-device during MVP bring-up. |
+
+## D. Explicitly out of scope / will not fake
+
+- We do **not** claim ProRes support — no legally licensed ProRes encoder implementation is available for this
+  project; `docs/CAMERA_PIPELINE.md` documents an external-recorder fallback instead.
+- We do **not** claim CinemaDNG/RAW-video works on this hardware — it is marked "unresolved research path" (C-3)
+  until a capability dump proves otherwise.
+- We do **not** disable verified boot or SELinux enforcement in any release-tagged build variant.
+- We do **not** redistribute any Xiaomi/Qualcomm proprietary vendor blob; `vendor/oiw/nuwa/extract-files.sh` only
+  extracts from a device the user owns, locally.

@@ -1,0 +1,11 @@
+{
+  "id": "max_quality_short_take",
+  "displayName": "Max Quality Short Take",
+  "warningThermalStatus": "MODERATE",
+  "forcedStopThermalStatus": "SEVERE",
+  "displayBrightnessCapPercent": 100,
+  "backgroundServicesForegroundOnly": true,
+  "radiosForcedOff": [],
+  "chargingWarning": true,
+  "loggingLevel": "verbose"
+}
