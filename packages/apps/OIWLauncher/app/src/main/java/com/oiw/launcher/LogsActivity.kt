@@ -23,10 +23,7 @@ class LogsActivity : AppCompatActivity() {
     }
 
     private fun readLatestLog(): String {
-        val logsDir = File(
-            getExternalFilesDir(null)?.parentFile?.parentFile,
-            "OIW_MEDIA/logs",
-        )
+        val logsDir = File(android.os.Environment.getExternalStorageDirectory(), "OIW_MEDIA/logs")
         val latest = logsDir.listFiles()?.maxByOrNull { it.lastModified() }
         return latest?.readText() ?: "No log files found under ${logsDir.absolutePath}."
     }

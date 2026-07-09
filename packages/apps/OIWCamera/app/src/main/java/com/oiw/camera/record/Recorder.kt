@@ -7,15 +7,14 @@ import android.media.MediaMuxer
 import android.view.Surface
 import com.oiw.camera.capture.CaptureProfile
 import java.io.File
-import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Camera2 encoder-Surface -> MediaCodec (hardware encode) -> MediaMuxer (MP4) pipeline.
- * Drains encoder output on a dedicated thread with a bounded queue so a slow storage target
- * shows up as the dropped-frame indicator rather than blocking the camera capture loop
- * (docs/STORAGE_MEDIA.md #6, docs/CINEMA_FEATURES.md #2).
+ * Camera2 encoder-Surface -> MediaCodec (hardware encode) -> MediaMuxer (MP4) pipeline with a
+ * synchronized AAC audio track and keyframe-aligned segment rollover. Encoder output drains on a
+ * dedicated thread; muxer write failures surface as the dropped-frame indicator rather than
+ * blocking the camera capture loop (docs/STORAGE_MEDIA.md #5-6, docs/CINEMA_FEATURES.md #2).
  */
 class Recorder(
     private val outputDir: File,
@@ -40,10 +39,12 @@ class Recorder(
     private val muxerLock = Any()
     private val running = AtomicBoolean(false)
     private val droppedFrames = AtomicInteger(0)
-    private val writerQueue = LinkedBlockingQueue<MediaCodec.BufferInfo>(WRITER_QUEUE_CAPACITY)
     private var writerThread: Thread? = null
     private var segmentIndex = 0
     private var segmentStartNanos = 0L
+    private var bytesThisSegment = 0L
+    var segmentMaxBytes: Long = 4L * 1024 * 1024 * 1024   // 4 GB default, docs/STORAGE_MEDIA.md #5
+    var segmentMaxNanos: Long = 600L * 1_000_000_000      // 10 min default
 
     /** Returns the Surface the CameraController's capture request should target for the encoder stream. */
     fun createEncoderInputSurface(): Surface {
@@ -78,13 +79,19 @@ class Recorder(
         writerThread = Thread(::drainLoop, "OIWRecorderWriter").also { it.start() }
     }
 
-    /** Called periodically (or on a size/time threshold) to roll to a new segment file, docs/STORAGE_MEDIA.md #5. */
-    fun rolloverSegmentIfNeeded(thresholdBytes: Long, thresholdNanos: Long, currentBytesWritten: Long) {
+    /**
+     * Rolls to a new segment file when size/time thresholds hit (docs/STORAGE_MEDIA.md #5).
+     * Called from the drain loop after each video sample write (stub-audit fix: previously never
+     * invoked). Only rolls on a keyframe boundary so the new segment starts decodable.
+     */
+    private fun rolloverSegmentIfNeeded(isKeyframe: Boolean) {
+        if (!isKeyframe) return
         val elapsed = System.nanoTime() - segmentStartNanos
-        if (currentBytesWritten >= thresholdBytes || elapsed >= thresholdNanos) {
+        if (bytesThisSegment >= segmentMaxBytes || elapsed >= segmentMaxNanos) {
             finalizeCurrentSegment()
             segmentIndex += 1
             segmentStartNanos = System.nanoTime()
+            bytesThisSegment = 0
             startNewMuxerSegment()
         }
     }
@@ -164,6 +171,7 @@ class Recorder(
                         ) {
                             try {
                                 currentMuxer.writeSampleData(videoTrackIndex, encodedData, bufferInfo)
+                                bytesThisSegment += bufferInfo.size
                             } catch (e: Exception) {
                                 listener.onError("Muxer write failed; treating as a dropped frame.", e)
                                 droppedFrames.incrementAndGet()
@@ -172,6 +180,7 @@ class Recorder(
                         }
                     }
                     codec.releaseOutputBuffer(outputIndex, false)
+                    rolloverSegmentIfNeeded((bufferInfo.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0)
                 }
                 // outputIndex == INFO_TRY_AGAIN_LATER: expected on timeout, nothing to do.
             }
@@ -204,7 +213,6 @@ class Recorder(
     }
 
     companion object {
-        private const val WRITER_QUEUE_CAPACITY = 8
         private const val DEQUEUE_TIMEOUT_US = 10_000L
         private const val WRITER_JOIN_TIMEOUT_MS = 2_000L
 

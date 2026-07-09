@@ -52,6 +52,10 @@ class ThermalMonitor(private val context: Context) {
     }
 
     companion object {
+        /** Maps a capture profile's thermalProfileId to a Mode (stub-audit wiring aid). */
+        fun modeForLabel(label: String): Mode =
+            Mode.values().firstOrNull { it.label == label } ?: Mode.BALANCED_FIELD
+
         /** Pure function, unit-testable without a real device or Context (docs/TEST_PLAN.md #1). */
         fun decide(mode: Mode, status: Int): RecordingAction = when {
             status >= mode.forcedStopStatus -> RecordingAction.ForceStop(

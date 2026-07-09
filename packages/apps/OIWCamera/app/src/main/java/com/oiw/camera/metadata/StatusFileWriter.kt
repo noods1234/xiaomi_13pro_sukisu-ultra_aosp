@@ -21,9 +21,9 @@ class StatusFileWriter(private val context: Context) {
     private val gson = Gson()
 
     fun write(status: Status) {
-        val root = File(context.getExternalFilesDir(null)?.parentFile?.parentFile, "OIW_MEDIA")
+        val root = com.oiw.camera.util.OiwPaths.mediaRoot()
         if (!root.isDirectory && !root.mkdirs()) return
-        val target = File(root, ".status.json")
+        val target = com.oiw.camera.util.OiwPaths.statusFile()
         val tmp = File(root, ".status.json.tmp")
         runCatching {
             FileOutputStream(tmp).use { fos ->

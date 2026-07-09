@@ -31,6 +31,8 @@ class CaptureSessionCoordinator(
         fun onLumaFrame(luma: LumaFrame.Luma)
         fun onRecordingStateChanged(recording: Boolean)
         fun onAudioMeters(peakDbfs: Double, rmsDbfs: Double, clippedSamples: Int)
+        fun onDroppedFrames(totalDropped: Int)
+        fun onCaptureResultSample(exposureNanos: Long?, isoSensitivity: Int?)
         fun onError(message: String, cause: Throwable? = null)
     }
 
@@ -38,6 +40,10 @@ class CaptureSessionCoordinator(
     private var recorder: Recorder? = null
     private var audio: AudioCapture? = null
     private var session: CameraCaptureSession? = null
+    private var activeProfile: CaptureProfile? = null
+    private val metadataWriter = com.oiw.camera.metadata.MetadataWriter()
+    @Volatile private var droppedTotal = 0
+    private var lastResultSampleNanos = 0L
     @Volatile var isRecording = false; private set
 
     /**
@@ -80,10 +86,27 @@ class CaptureSessionCoordinator(
         }
         session = s
 
+        activeProfile = profile
         val request = controller.buildManualRequest(
             profile, listOf(previewSurface, encoderSurface, reader.surface),
         ) ?: return false
-        s.setRepeatingRequest(request, null, analysisHandler)
+        // Sample the echoed manual-control values ~1/s (stub-audit fix: previously never wired) —
+        // this is how the UI proves the HAL honored the request (docs/TEST_PLAN.md #4 round-trip).
+        s.setRepeatingRequest(request, object : CameraCaptureSession.CaptureCallback() {
+            override fun onCaptureCompleted(
+                session: CameraCaptureSession,
+                req: CaptureRequest,
+                result: android.hardware.camera2.TotalCaptureResult,
+            ) {
+                val now = System.nanoTime()
+                if (now - lastResultSampleNanos < 1_000_000_000L) return
+                lastResultSampleNanos = now
+                listener.onCaptureResultSample(
+                    result.get(android.hardware.camera2.CaptureResult.SENSOR_EXPOSURE_TIME),
+                    result.get(android.hardware.camera2.CaptureResult.SENSOR_SENSITIVITY),
+                )
+            }
+        }, analysisHandler)
         return true
     }
 
@@ -115,8 +138,26 @@ class CaptureSessionCoordinator(
     }
 
     private val recorderListener = object : Recorder.Listener {
-        override fun onSegmentFinalized(file: File, segmentIndex: Int) { /* sidecar written by caller */ }
-        override fun onDroppedFrame(totalDropped: Int) { /* surfaced via CameraActivity indicator */ }
+        override fun onSegmentFinalized(file: File, segmentIndex: Int) {
+            // Sidecar per segment, written atomically (stub-audit fix: previously unwired).
+            val profile = activeProfile ?: return
+            val metadata = metadataWriter.buildFromProfile(
+                profile = profile,
+                cameraId = "0",
+                romBuild = android.os.Build.DISPLAY,
+                kernelBuild = System.getProperty("os.version") ?: "unknown",
+                deviceModel = android.os.Build.MODEL,
+            ).copy(droppedFrames = droppedTotal)
+            try {
+                metadataWriter.writeAtomically(file, metadata)
+            } catch (e: Exception) {
+                listener.onError("Sidecar write failed for ${file.name} — clip is intact, metadata is not.", e)
+            }
+        }
+        override fun onDroppedFrame(totalDropped: Int) {
+            droppedTotal = totalDropped
+            listener.onDroppedFrames(totalDropped)
+        }
         override fun onError(message: String, cause: Throwable?) = listener.onError(message, cause)
     }
 

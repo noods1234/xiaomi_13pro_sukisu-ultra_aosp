@@ -67,7 +67,12 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
     }
 
     private fun initializeSession() {
-        val profiles = profileRepository.loadAll()
+        if (!com.oiw.camera.util.OiwPaths.hasAllFilesAccess()) {
+            showError("OIWCamera needs 'All files access' to record to /sdcard/OIW_MEDIA. Opening Settings.")
+            startActivity(com.oiw.camera.util.OiwPaths.allFilesAccessIntent(this))
+            // Continue anyway — preview works without storage; recording preflight will refuse cleanly.
+        }
+        profiles = profileRepository.loadAll()
         profileRepository.loadErrors.forEach { showError(it) }
         val defaultProfile = profiles.firstOrNull()
         if (defaultProfile == null) {
@@ -75,6 +80,8 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
             return
         }
         activeProfile = defaultProfile
+        buttonMapping = com.oiw.camera.control.ButtonMappingLoader(this).load(defaultProfile.buttonMappingId)
+        window.decorView.postDelayed(thermalTick, 5_000)
 
         // Recovery scan runs before anything else touches storage (docs/STORAGE_MEDIA.md #9).
         val recoverable = storageManager.scanForRecoverableClips()
@@ -103,26 +110,81 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
     private val histogram = com.oiw.camera.overlay.HistogramOverlay()
     private val zebra = com.oiw.camera.overlay.ZebraOverlay()
     private val peaking = com.oiw.camera.overlay.FocusPeakingOverlay()
+    private val falseColor = com.oiw.camera.overlay.FalseColorOverlay()
+    private var overlayView: com.oiw.camera.overlay.OverlayView? = null
+    private var buttonMapping: com.oiw.camera.control.ButtonMappingLoader.Mapping? = null
+    private var profiles: List<CaptureProfile> = emptyList()
+    private var profileIndex = 0
+    private val statusWriter by lazy { com.oiw.camera.metadata.StatusFileWriter(this) }
+    private val thermalTick = object : Runnable {
+        override fun run() {
+            val coord = coordinator ?: return
+            val profile = activeProfile
+            if (coord.isRecording && profile != null) {
+                // Graceful-stop state machine (docs/THERMAL_POWER.md #8) — stub-audit fix: now polled.
+                val mode = com.oiw.camera.thermal.ThermalMonitor.modeForLabel(profile.thermalProfileId)
+                when (val action = com.oiw.camera.thermal.ThermalMonitor.decide(mode, thermalMonitor.currentStatus())) {
+                    is com.oiw.camera.thermal.ThermalMonitor.RecordingAction.Warn -> showError(action.message)
+                    is com.oiw.camera.thermal.ThermalMonitor.RecordingAction.ForceStop -> {
+                        showError(action.reason)
+                        coord.stopRecording()
+                    }
+                    else -> Unit
+                }
+            }
+            window.decorView.postDelayed(this, 5_000)
+        }
+    }
 
     private fun wireSessionWhenSurfaceReady(profile: CaptureProfile) {
         val controller = cameraController ?: return
         val analysisThread = android.os.HandlerThread("OIWAnalysis").also { it.start() }
-        val overlayView = com.oiw.camera.overlay.OverlayView(this).also {
+        val overlay = com.oiw.camera.overlay.OverlayView(this).also {
+            it.guideAspect = profile.lensMetadataDefaults?.anamorphicSqueeze?.let { sq -> (16f / 9f * sq.toFloat()) }
+                ?: 2.39f
+            it.showFalseColor = "false_color" in profile.monitoringOverlays
             findViewById<android.widget.FrameLayout>(R.id.overlay_container).addView(it)
         }
+        overlayView = overlay
+        applyDesqueeze(profile)
+
         val coord = com.oiw.camera.camera.CaptureSessionCoordinator(
             controller,
             mainExecutor,
             android.os.Handler(analysisThread.looper),
             object : com.oiw.camera.camera.CaptureSessionCoordinator.Listener {
                 override fun onLumaFrame(luma: com.oiw.camera.overlay.LumaFrame.Luma) {
-                    overlayView.submit(luma, zebra.computeMask(luma), peaking.computeMask(luma), histogram.compute(luma))
+                    overlay.submit(
+                        luma,
+                        if (overlay.showZebra) zebra.computeMask(luma) else null,
+                        if (overlay.showPeaking) peaking.computeMask(luma) else null,
+                        histogram.compute(luma),
+                        if (overlay.showFalseColor) falseColor.colorize(luma) else null,
+                    )
                 }
                 override fun onRecordingStateChanged(recording: Boolean) = runOnUiThread {
                     findViewById<android.widget.Button>(R.id.record_button).text =
                         if (recording) "STOP" else getString(R.string.record_button)
+                    // Foreground service keeps the take alive when locked (stub-audit fix: now started).
+                    val svc = android.content.Intent(this@CameraActivity, com.oiw.camera.record.RecordingService::class.java)
+                    if (recording) startForegroundService(svc) else stopService(svc)
+                    updateStatusFile()
                 }
-                override fun onAudioMeters(peakDbfs: Double, rmsDbfs: Double, clippedSamples: Int) { /* bottom bar */ }
+                override fun onAudioMeters(peakDbfs: Double, rmsDbfs: Double, clippedSamples: Int) = runOnUiThread {
+                    updateBottomBar(audioDb = peakDbfs, clipped = clippedSamples)
+                }
+                override fun onDroppedFrames(totalDropped: Int) = runOnUiThread {
+                    updateBottomBar(drops = totalDropped)
+                    if (totalDropped > 0) showError("Dropped frames: $totalDropped — check storage write speed.")
+                }
+                override fun onCaptureResultSample(exposureNanos: Long?, isoSensitivity: Int?) = runOnUiThread {
+                    statusBase =
+                        "${profile.resolution.width}x${profile.resolution.height}·${profile.frameRateFps}p " +
+                        "${profile.codec} ${profile.bitrateBps / 1_000_000}Mbps · " +
+                        "exp ${exposureNanos?.let { "1/${1_000_000_000 / it.coerceAtLeast(1)}" } ?: "--"} " +
+                        "ISO ${isoSensitivity ?: "--"} · ${profile.displayName}"
+                    renderStatusBar()
+                }
                 override fun onError(message: String, cause: Throwable?) = this@CameraActivity.onError(message, cause)
             },
         )
@@ -148,9 +210,106 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
             }
         }
 
-        findViewById<android.widget.Button>(R.id.record_button).setOnClickListener {
-            if (coord.isRecording) coord.stopRecording() else coord.startRecording()
+        findViewById<android.widget.Button>(R.id.record_button).setOnClickListener { toggleRecording() }
+        findViewById<android.widget.Button>(R.id.still_button).setOnClickListener {
+            // DNG stills need a dedicated RAW ImageReader stream added to the session — honest state
+            // per docs/CAMERA_PIPELINE.md #3: hidden/inert unless RAW is reported. YUV stills TBD.
+            if (cameraController?.capabilities?.hasRaw != true) {
+                showError("RAW capability not reported for this camera. Still capture is unavailable in this build.")
+            } else {
+                showError("RAW still flow requires the RAW stream session variant — tracked in implementation_plan Phase 5.")
+            }
         }
+        findViewById<android.widget.Button>(R.id.profile_button).setOnClickListener { cycleProfile() }
+    }
+
+    /** Preflight gate before rolling (stub-audit fix: docs promised it, now enforced). */
+    private fun toggleRecording() {
+        val coord = coordinator ?: return
+        val profile = activeProfile ?: return
+        if (coord.isRecording) { coord.stopRecording(); return }
+        val target = storageManager.projectClipDir("untitled", java.time.LocalDate.now().toString(), "A_CAM", "preflight")
+        val benchmark = storageManager.loadLastBenchmark(profile.storageTarget)
+        val preflight = storageManager.preflight(target, profile.bitrateBps, benchmark)
+        if (!preflight.ok) {
+            showError(preflight.message)
+            return
+        }
+        coord.startRecording()
+    }
+
+    private fun cycleProfile() {
+        if (profiles.isEmpty()) return
+        if (coordinator?.isRecording == true) {
+            showError("Profile switch is disabled while recording.")
+            return
+        }
+        profileIndex = (profileIndex + 1) % profiles.size
+        activeProfile = profiles[profileIndex]
+        showError("Profile: ${profiles[profileIndex].displayName}. Restarting session.")
+        // Full session restart with the new profile: release and rewire.
+        coordinator?.release()
+        activeProfile?.let { wireSessionWhenSurfaceReady(it) }
+        updateStatusFile()
+    }
+
+    /** Anamorphic desqueeze preview (stub-audit fix): horizontal stretch on the TextureView only. */
+    private fun applyDesqueeze(profile: CaptureProfile) {
+        val squeeze = profile.lensMetadataDefaults?.anamorphicSqueeze ?: return
+        val m = android.graphics.Matrix()
+        m.setScale(squeeze.toFloat(), 1f, textureView.width / 2f, 0f)
+        textureView.setTransform(m)
+    }
+
+    private var statusBase = ""
+    private var lastDrops = 0
+    private var lastAudioDb = Double.NEGATIVE_INFINITY
+    private var lastClipped = 0
+    private fun updateBottomBar(drops: Int = lastDrops, audioDb: Double = lastAudioDb, clipped: Int = lastClipped) {
+        lastDrops = drops; lastAudioDb = audioDb; lastClipped = clipped
+        renderStatusBar()
+    }
+
+    /** Single render point: base (from CaptureResult sampling) + live suffix. Never appends. */
+    private fun renderStatusBar() {
+        val clipNote = if (lastClipped > 0) " CLIP!" else ""
+        val audio = if (lastAudioDb.isFinite()) "%.0fdB".format(lastAudioDb) else "--"
+        findViewById<android.widget.TextView>(R.id.status_bar).text =
+            "$statusBase  |  drops:$lastDrops  audio:$audio$clipNote"
+    }
+
+    private fun updateStatusFile() {
+        val free = runCatching {
+            storageManager.freeBytes(storageManager.mediaRoot()) / 1_000_000_000.0
+        }.getOrNull()
+        statusWriter.write(
+            com.oiw.camera.metadata.StatusFileWriter.Status(
+                storageFreeGb = free,
+                thermalMode = activeProfile?.thermalProfileId,
+                batteryPercent = null,
+                lastProfileId = activeProfile?.id,
+            )
+        )
+    }
+
+    /** Hardware button mapping (stub-audit fix: configs/button_mappings now actually consumed). */
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        val mapping = buttonMapping ?: return super.onKeyDown(keyCode, event)
+        val input = when (keyCode) {
+            android.view.KeyEvent.KEYCODE_VOLUME_UP -> "volume_up_short"
+            android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> "volume_down_short"
+            android.view.KeyEvent.KEYCODE_R -> "hid_key_r"
+            android.view.KeyEvent.KEYCODE_SPACE -> "hid_key_space"
+            else -> return super.onKeyDown(keyCode, event)
+        }
+        when (com.oiw.camera.control.ButtonMappingLoader(this).actionFor(mapping, input)) {
+            "record_toggle" -> toggleRecording()
+            "still_capture" -> findViewById<android.widget.Button>(R.id.still_button).performClick()
+            "profile_cycle" -> cycleProfile()
+            "focus_assist_toggle" -> overlayView?.let { it.showPeaking = !it.showPeaking }
+            else -> return super.onKeyDown(keyCode, event)
+        }
+        return true
     }
 
     override fun onError(message: String, cause: Throwable?) {

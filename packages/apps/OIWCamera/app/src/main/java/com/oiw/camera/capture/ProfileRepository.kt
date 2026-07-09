@@ -39,7 +39,7 @@ class ProfileRepository(private val context: Context) {
     }
 
     private fun loadUserProfiles(): List<CaptureProfile> {
-        val dir = File(context.getExternalFilesDir(null)?.parentFile?.parentFile, "OIW_MEDIA/plugins/profiles")
+        val dir = com.oiw.camera.util.OiwPaths.userProfilesDir()
         if (!dir.isDirectory) return emptyList()
         val files = dir.listFiles { f -> f.extension == "json" } ?: return emptyList()
         return files.mapNotNull { file ->

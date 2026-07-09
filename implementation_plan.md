@@ -58,22 +58,24 @@ have no code dependency — only a documentation cross-reference.
 - [x] Preview + manual control panel skeleton.
 - [x] Recording pipeline core: Camera2 → MediaCodec → MediaMuxer with synchronized A/V tracks (`Recorder` +
       `AudioCapture`), session wiring (`CaptureSessionCoordinator`), overlay compositor (`OverlayView`).
-- [ ] **Stub audit 2026-07-06 — written but NOT yet wired into the recording flow** (each is a small,
-      concrete wiring task, not missing functionality): sidecar write on segment finalize (`MetadataWriter`
-      exists, no caller); dropped-frame + audio-meter UI indicators (listener bodies empty); segment rollover
-      trigger (`rolloverSegmentIfNeeded` never called — needs a byte/time tick); storage preflight gate before
-      record start (`preflight` never called); thermal graceful-stop loop (`ThermalMonitor.decide` never polled
-      during recording); `StatusFileWriter`, `RecordingService` (lock-screen recording), `DngStillCaptor` (no
-      still-button flow), `ExternalControlServer` (no `CommandHandler` impl / not instantiated); still + profile
-      buttons have no onClick; button-mapping JSON not loaded (no KeyEvent interception); `TotalCaptureResult`
-      sampling not wired (`onCaptureResultSample` never invoked); `writerQueue` field is vestigial (drain loop
-      writes directly — remove or implement the bounded queue).
-- [ ] **Known bug (found in stub audit):** media root resolves to `/sdcard/Android/data/OIW_MEDIA`
-      (`getExternalFilesDir(null).parentFile.parentFile`), not the documented `/sdcard/OIW_MEDIA` — and
-      Android 11+ blocks cross-app reads of `Android/data`, so OIWLauncher cannot read the status file there.
-      Fix: use `Environment.getExternalStorageDirectory()`-rooted `OIW_MEDIA` via MediaStore/SAF, or move the
-      status handshake to a `ContentProvider`. Affects `StorageManager`, `StatusFileWriter`,
-      `LauncherStatusReader`, `ProfileRepository` user-profile dir.
+- [x] **Stub-audit burn-down (2026-07-06, second pass):** sidecar-on-finalize wired (coordinator ->
+      `MetadataWriter`, includes dropped-frame count); dropped-frame + audio-meter UI wired (single-render
+      status bar, no append growth); keyframe-aligned segment rollover now fires from the drain loop
+      (4 GB/10 min defaults); storage preflight gate enforced on record start (reads
+      `OIW_MEDIA/benchmarks/<target>.json` from `tools/storage_benchmark.sh`); thermal graceful-stop loop polls
+      every 5 s and force-stops per profile mode; `StatusFileWriter` updates on record/profile changes;
+      `RecordingService` started/stopped with recording; button-mapping JSON loaded from assets/user dir and
+      consumed by `onKeyDown` (volume/HID keys); `TotalCaptureResult` echo sampled ~1/s into the status bar;
+      vestigial `writerQueue` removed; `FalseColorOverlay` implemented (IRE-banded, unit-tested) and rendered
+      by `OverlayView`; anamorphic desqueeze applied via `TextureView.setTransform`; profile cycling restarts
+      the session.
+- [x] **Path bug fixed:** media root now `Environment.getExternalStorageDirectory()/OIW_MEDIA` via `OiwPaths`
+      (single source of truth), `MANAGE_EXTERNAL_STORAGE` declared + Settings-intent request flow; launcher
+      reads status through the new permission-free `StatusProvider` ContentProvider (file fallback kept).
+- [ ] Remaining honest gaps: DNG still needs a RAW-stream session variant (still button reports this
+      explicitly); YUV still capture not built; `ExternalControlServer` has no `CommandHandler` binding into
+      the coordinator yet (class complete, instantiation pending a Settings toggle UI); LUT-on-preview GL
+      shader + waveform/vectorscope (GPU work item); slate UI; timecode display.
 - [x] Capture profile loader/schema.
 - [x] JSON sidecar metadata writer.
 - [ ] **User action:** field-test one full capture profile end to end on real hardware and confirm no dropped frames

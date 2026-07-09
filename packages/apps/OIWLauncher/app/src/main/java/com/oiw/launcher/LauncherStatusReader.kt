@@ -30,12 +30,22 @@ class LauncherStatusReader(private val context: Context) {
 
     private val gson = Gson()
 
+    /**
+     * Reads via OIWCamera's StatusProvider ContentProvider (permission-free handshake — the
+     * stub-audit fix for the Android/data cross-app path bug). Falls back to the shared-storage
+     * file directly only if the provider is unreachable AND this app happens to have read access.
+     */
     fun readLastKnownStatus(): Status? {
-        val statusFile = File(
-            context.getExternalFilesDir(null)?.parentFile?.parentFile,
-            "OIW_MEDIA/.status.json",
-        )
-        if (!statusFile.exists()) return null
-        return runCatching { gson.fromJson(statusFile.readText(), Status::class.java) }.getOrNull()
+        val viaProvider = runCatching {
+            context.contentResolver.call(
+                android.net.Uri.parse("content://com.oiw.camera.status"),
+                "get_status", null, null,
+            )?.getString("status_json")
+        }.getOrNull()
+        val json = viaProvider ?: runCatching {
+            val f = File(android.os.Environment.getExternalStorageDirectory(), "OIW_MEDIA/.status.json")
+            if (f.exists()) f.readText() else null
+        }.getOrNull() ?: return null
+        return runCatching { gson.fromJson(json, Status::class.java) }.getOrNull()
     }
 }

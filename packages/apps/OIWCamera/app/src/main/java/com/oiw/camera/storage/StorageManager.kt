@@ -60,7 +60,24 @@ class StorageManager(private val context: Context) {
         return root
     }
 
-    fun mediaRoot(): File = File(context.getExternalFilesDir(null)?.parentFile?.parentFile, "OIW_MEDIA")
+    fun mediaRoot(): File = com.oiw.camera.util.OiwPaths.mediaRoot()
+
+    /**
+     * Loads the last write-speed benchmark for a target ("internal" | "external_ssd") from the JSON
+     * that tools/storage_benchmark.sh writes (user copies/redirects it to
+     * OIW_MEDIA/benchmarks/<target>.json), or that a future in-app benchmark writes to the same spot.
+     */
+    fun loadLastBenchmark(target: String): BenchmarkResult? {
+        val file = File(com.oiw.camera.util.OiwPaths.benchmarksDir(), "$target.json")
+        if (!file.exists()) return null
+        return runCatching {
+            val obj = com.google.gson.Gson().fromJson(file.readText(), com.google.gson.JsonObject::class.java)
+            BenchmarkResult(
+                sustainedWriteMbps = obj.get("sustainedWriteMbps").asDouble,
+                sampleSizeBytes = obj.get("sampleSizeBytes")?.asLong ?: 0L,
+            )
+        }.getOrNull()
+    }
 
     /** Detected via the public StorageVolume API — no custom USB mass-storage driver logic here. */
     fun listExternalVolumes(): List<String> {
