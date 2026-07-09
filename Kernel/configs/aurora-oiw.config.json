@@ -1,25 +1,27 @@
 [
     {
-        "_comment": "OIW cinema kernel for Xiaomi 14 Ultra (aurora) from OFFICIAL Xiaomi OSS source (Linux 6.1 GKI). Disabled (.stop) until the drivers/misc/hwid Kconfig stub step is added to the workflow — see kernel/oiw/aurora/README.md. Config-verified 2026-07-06; compile pending.",
+        "_comment": "OIW cinema kernel for Xiaomi 14 Ultra (aurora) from OFFICIAL Xiaomi OSS source (Linux 6.1 GKI). ENABLED 2026-07-06: the workflow's OIW inject step now stubs the drivers/misc/hwid Kconfig gap automatically. Config-verified; first full compile happens on workflow_dispatch (release:false until a build passes). See kernel/oiw/aurora/README.md.",
         "kernelSource": {
-        "name": "aurora-oiw-cinema-kernel_xiaomi_sm8650",
-        "repo": "https://github.com/noods1234/xiaomi_kernel_opensource.git",
-        "branch": "aurora-u-oss",
-        "device": "gki",
-        "defconfig": "gki_defconfig"
+            "name": "aurora-oiw-cinema-kernel_xiaomi_sm8650",
+            "repo": "https://github.com/noods1234/xiaomi_kernel_opensource.git",
+            "branch": "aurora-u-oss",
+            "device": "gki",
+            "defconfig": "gki_defconfig"
         },
         "oiwCinemaFragment": "kernel/oiw/aurora/configs/oiw_cinema.config",
         "toolchains": [
             {
                 "name": "clang",
                 "url": "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r536225.tar.gz",
-                "binaryEnv": ["./bin"]
+                "binaryEnv": [
+                    "./bin"
+                ]
             }
         ],
         "enableCcache": true,
         "params": {
-        "ARCH": "arm64",
-        "CC": "clang",
+            "ARCH": "arm64",
+            "CC": "clang",
             "externalCommands": {
                 "CROSS_COMPILE": "aarch64-linux-gnu-",
                 "CROSS_COMPILE_ARM32": "arm-linux-gnueabi-",

@@ -95,12 +95,61 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
                 showError("Failed to open camera $cameraId.")
                 return@launch
             }
-            // Session/recording wiring (TextureView SurfaceTexture -> preview Surface,
-            // Recorder.createEncoderInputSurface() -> encoder Surface, ImageReader -> analysis
-            // Surface for the overlay processors) is intentionally left as the next concrete
-            // implementation step once a preview SurfaceTexture is available
-            // (TextureView.SurfaceTextureListener#onSurfaceTextureAvailable) — this file wires the
-            // lifecycle and error-handling contract that step plugs into.
+            wireSessionWhenSurfaceReady(defaultProfile)
+        }
+    }
+
+    private var coordinator: com.oiw.camera.camera.CaptureSessionCoordinator? = null
+    private val histogram = com.oiw.camera.overlay.HistogramOverlay()
+    private val zebra = com.oiw.camera.overlay.ZebraOverlay()
+    private val peaking = com.oiw.camera.overlay.FocusPeakingOverlay()
+
+    private fun wireSessionWhenSurfaceReady(profile: CaptureProfile) {
+        val controller = cameraController ?: return
+        val analysisThread = android.os.HandlerThread("OIWAnalysis").also { it.start() }
+        val overlayView = com.oiw.camera.overlay.OverlayView(this).also {
+            findViewById<android.widget.FrameLayout>(R.id.overlay_container).addView(it)
+        }
+        val coord = com.oiw.camera.camera.CaptureSessionCoordinator(
+            controller,
+            mainExecutor,
+            android.os.Handler(analysisThread.looper),
+            object : com.oiw.camera.camera.CaptureSessionCoordinator.Listener {
+                override fun onLumaFrame(luma: com.oiw.camera.overlay.LumaFrame.Luma) {
+                    overlayView.submit(luma, zebra.computeMask(luma), peaking.computeMask(luma), histogram.compute(luma))
+                }
+                override fun onRecordingStateChanged(recording: Boolean) = runOnUiThread {
+                    findViewById<android.widget.Button>(R.id.record_button).text =
+                        if (recording) "STOP" else getString(R.string.record_button)
+                }
+                override fun onAudioMeters(peakDbfs: Double, rmsDbfs: Double, clippedSamples: Int) { /* bottom bar */ }
+                override fun onError(message: String, cause: Throwable?) = this@CameraActivity.onError(message, cause)
+            },
+        )
+        coordinator = coord
+
+        val startPreview: (android.graphics.SurfaceTexture) -> Unit = { texture ->
+            lifecycleScope.launch {
+                val clipDir = storageManager.projectClipDir(
+                    "untitled", java.time.LocalDate.now().toString(), "A_CAM",
+                    "CLIP_%04d".format(System.currentTimeMillis() % 10000),
+                )
+                if (!coord.startPreview(profile, texture, clipDir, clipDir.name)) {
+                    showError("Preview failed to start for profile '${profile.id}'.")
+                }
+            }
+        }
+        textureView.surfaceTexture?.let(startPreview) ?: run {
+            textureView.surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
+                override fun onSurfaceTextureAvailable(st: android.graphics.SurfaceTexture, w: Int, h: Int) = startPreview(st)
+                override fun onSurfaceTextureSizeChanged(st: android.graphics.SurfaceTexture, w: Int, h: Int) {}
+                override fun onSurfaceTextureDestroyed(st: android.graphics.SurfaceTexture) = true
+                override fun onSurfaceTextureUpdated(st: android.graphics.SurfaceTexture) {}
+            }
+        }
+
+        findViewById<android.widget.Button>(R.id.record_button).setOnClickListener {
+            if (coord.isRecording) coord.stopRecording() else coord.startRecording()
         }
     }
 

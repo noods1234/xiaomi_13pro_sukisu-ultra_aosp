@@ -355,6 +355,21 @@ jobs:
           OIW_FRAGMENT: ${{ matrix.CONFIG.oiwCinemaFragment }}
         if: ${{ matrix.CONFIG.oiwCinemaFragment != '' && matrix.CONFIG.oiwCinemaFragment != null }}
         run: |
+          # Xiaomi OSS drops sometimes reference Kconfig dirs they omit (e.g. drivers/misc/hwid in
+          # aurora-u-oss). Stub any missing Kconfig the top-level tree references so configuration
+          # can proceed; stubs default the symbol off and add no code.
+          cd "${{ env.WORKSPACE }}/${{ env.KERNEL_NAME }}"
+          if grep -q 'drivers/misc/hwid/Kconfig' drivers/misc/Kconfig 2>/dev/null && [ ! -f drivers/misc/hwid/Kconfig ]; then
+            mkdir -p drivers/misc/hwid
+            printf 'config HWID\n\tbool "Xiaomi hwid (OIW stub, missing from OSS drop)"\n\tdefault n\n' > drivers/misc/hwid/Kconfig
+            # Guard the Makefile reference too, if present, so an absent obj dir can't break the build.
+            if grep -q 'hwid' drivers/misc/Makefile 2>/dev/null; then
+              sed -i 's|^obj-\$(CONFIG_HWID).*|obj-$(CONFIG_HWID) += hwid/|' drivers/misc/Makefile || true
+              mkdir -p drivers/misc/hwid && touch drivers/misc/hwid/Makefile
+            fi
+            echo "🎬 Stubbed missing drivers/misc/hwid Kconfig"
+          fi
+          cd "${{ env.WORKSPACE }}"
           CONFIG_FILE="${{ env.WORKSPACE }}/${{ env.KERNEL_NAME }}/arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}"
           FRAGMENT_FILE="${{ env.WORKSPACE }}/${{ env.OIW_FRAGMENT }}"
           if [ ! -f "$FRAGMENT_FILE" ]; then

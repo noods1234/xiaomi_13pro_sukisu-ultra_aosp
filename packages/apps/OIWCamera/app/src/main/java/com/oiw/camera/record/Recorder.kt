@@ -32,7 +32,12 @@ class Recorder(
     private lateinit var codec: MediaCodec
     private var muxer: MediaMuxer? = null
     private var videoTrackIndex = -1
+    private var audioTrackIndex = -1
+    private var videoFormat: MediaFormat? = null
+    private var audioFormat: MediaFormat? = null
+    var audioEnabled: Boolean = true
     private var muxerStarted = false
+    private val muxerLock = Any()
     private val running = AtomicBoolean(false)
     private val droppedFrames = AtomicInteger(0)
     private val writerQueue = LinkedBlockingQueue<MediaCodec.BufferInfo>(WRITER_QUEUE_CAPACITY)
@@ -85,10 +90,53 @@ class Recorder(
     }
 
     private fun startNewMuxerSegment() {
-        val segmentFile = File(outputDir, "${clipBaseName}_seg%03d.mp4".format(segmentIndex))
-        muxer = MediaMuxer(segmentFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-        muxerStarted = false
-        videoTrackIndex = -1
+        synchronized(muxerLock) {
+            val segmentFile = File(outputDir, "${clipBaseName}_seg%03d.mp4".format(segmentIndex))
+            muxer = MediaMuxer(segmentFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            muxerStarted = false
+            videoTrackIndex = -1
+            audioTrackIndex = -1
+            maybeStartMuxerLocked()
+        }
+    }
+
+    /** Muxer starts only once every enabled track's format is known — required by MediaMuxer. */
+    private fun maybeStartMuxerLocked() {
+        val m = muxer ?: return
+        if (muxerStarted) return
+        val vf = videoFormat ?: return
+        val af = audioFormat
+        if (audioEnabled && af == null) return
+        videoTrackIndex = m.addTrack(vf)
+        if (audioEnabled && af != null) audioTrackIndex = m.addTrack(af)
+        m.start()
+        muxerStarted = true
+    }
+
+    /** Called from AudioCapture's listener when the AAC encoder reports its real output format. */
+    fun onAudioFormatReady(format: MediaFormat) {
+        synchronized(muxerLock) {
+            audioFormat = format
+            maybeStartMuxerLocked()
+        }
+    }
+
+    /** Called from AudioCapture's listener per encoded AAC buffer; releases the codec buffer. */
+    fun writeAudioSample(audioCodec: MediaCodec, outputIndex: Int, info: MediaCodec.BufferInfo) {
+        val data = audioCodec.getOutputBuffer(outputIndex)
+        synchronized(muxerLock) {
+            val m = muxer
+            if (data != null && m != null && muxerStarted && audioTrackIndex >= 0 &&
+                info.size > 0 && (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0
+            ) {
+                try {
+                    m.writeSampleData(audioTrackIndex, data, info)
+                } catch (e: Exception) {
+                    listener.onError("Audio muxer write failed.", e)
+                }
+            }
+        }
+        audioCodec.releaseOutputBuffer(outputIndex, false)
     }
 
     private fun drainLoop() {
@@ -102,23 +150,25 @@ class Recorder(
             }
             when {
                 outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                    val currentMuxer = muxer ?: continue
-                    videoTrackIndex = currentMuxer.addTrack(codec.outputFormat)
-                    currentMuxer.start()
-                    muxerStarted = true
+                    synchronized(muxerLock) {
+                        videoFormat = codec.outputFormat
+                        maybeStartMuxerLocked()
+                    }
                 }
                 outputIndex >= 0 -> {
                     val encodedData = codec.getOutputBuffer(outputIndex)
-                    val currentMuxer = muxer
-                    if (encodedData != null && muxerStarted && currentMuxer != null &&
-                        bufferInfo.size > 0 && (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0
-                    ) {
-                        try {
-                            currentMuxer.writeSampleData(videoTrackIndex, encodedData, bufferInfo)
-                        } catch (e: Exception) {
-                            listener.onError("Muxer write failed; treating as a dropped frame.", e)
-                            droppedFrames.incrementAndGet()
-                            listener.onDroppedFrame(droppedFrames.get())
+                    synchronized(muxerLock) {
+                        val currentMuxer = muxer
+                        if (encodedData != null && muxerStarted && currentMuxer != null &&
+                            bufferInfo.size > 0 && (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0
+                        ) {
+                            try {
+                                currentMuxer.writeSampleData(videoTrackIndex, encodedData, bufferInfo)
+                            } catch (e: Exception) {
+                                listener.onError("Muxer write failed; treating as a dropped frame.", e)
+                                droppedFrames.incrementAndGet()
+                                listener.onDroppedFrame(droppedFrames.get())
+                            }
                         }
                     }
                     codec.releaseOutputBuffer(outputIndex, false)
@@ -137,13 +187,17 @@ class Recorder(
     }
 
     private fun finalizeCurrentSegment() {
-        val currentMuxer = muxer ?: return
-        try {
-            if (muxerStarted) currentMuxer.stop()
-        } catch (e: Exception) {
-            listener.onError("File finalization failed for segment $segmentIndex. Attempting recovery.", e)
-        } finally {
-            currentMuxer.release()
+        synchronized(muxerLock) {
+            val currentMuxer = muxer ?: return
+            try {
+                if (muxerStarted) currentMuxer.stop()
+            } catch (e: Exception) {
+                listener.onError("File finalization failed for segment $segmentIndex. Attempting recovery.", e)
+            } finally {
+                currentMuxer.release()
+                muxer = null
+                muxerStarted = false
+            }
         }
         val segmentFile = File(outputDir, "${clipBaseName}_seg%03d.mp4".format(segmentIndex))
         listener.onSegmentFinalized(segmentFile, segmentIndex)

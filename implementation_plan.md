@@ -51,12 +51,12 @@ have no code dependency — only a documentation cross-reference.
 - [x] `StorageManager` (preflight, benchmark hook, safe naming, segmentation) — implemented in-app.
 - [x] Thermal awareness (`ThermalMonitor` reading `/sys/class/thermal` via root, throttle policy) — implemented in-app.
 - [x] Metadata/sidecar writer — implemented in-app.
-- [ ] External control socket service (local-only, pairing-token gated) — see `docs/API_PLUGIN_FRAMEWORK.md`.
+- [x] External control socket service (local-only, pairing-token gated, disabled by default) — `control/ExternalControlServer.kt`.
 
 ## Phase 5 — OIWCamera MVP
 
 - [x] Preview + manual control panel skeleton.
-- [x] Recording pipeline skeleton (Camera2 → MediaCodec → MediaMuxer).
+- [x] Recording pipeline: Camera2 → MediaCodec → MediaMuxer with synchronized A/V tracks (`Recorder` + `AudioCapture`), full session wiring (`CaptureSessionCoordinator`), DNG stills (`DngStillCaptor`), overlay compositor (`OverlayView`), launcher status writer, CSV exporter.
 - [x] Capture profile loader/schema.
 - [x] JSON sidecar metadata writer.
 - [ ] **User action:** field-test one full capture profile end to end on real hardware and confirm no dropped frames

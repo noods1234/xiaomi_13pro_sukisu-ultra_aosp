@@ -18,8 +18,8 @@
 
 ## Build variant
 
-`Kernel/configs/aurora-oiw.config.json.stop` is a ready CI matrix entry for the existing SukiSU workflow
+`Kernel/configs/aurora-oiw.config.json` is an **enabled** CI matrix entry for the existing SukiSU workflow
 (repo = this project's own mirror @ `aurora-u-oss`, `gki_defconfig`, SUSFS branch `gki-android14-6.1`,
-`oiwCinemaFragment` → this directory). It ships **`.stop`-disabled** because (a) the hwid Kconfig gap needs a
-patch step before the compile passes, and (b) a 6.1 build of this workflow hasn't been exercised yet — rename to
-`.config.json` after adding the hwid stub step to enable it. Honest status: config-verified, compile-pending.
+`oiwCinemaFragment` → this directory). The workflow's OIW inject step now auto-stubs the hwid Kconfig gap.
+`release: false` until the first `workflow_dispatch` compile passes. Honest status: config-verified,
+compile-pending-first-CI-run.
