@@ -29,6 +29,13 @@
            path="device/xiaomi/aurora" remote="github" revision="bka" />
   <project name="Neoteric-OS/android_device_xiaomi_aurora-kernel"
            path="device/xiaomi/aurora-kernel" remote="github" revision="bka" />
+  <project name="Neoteric-OS/android_hardware_xiaomi"
+           path="hardware/xiaomi" remote="github" revision="bka" />
+  <project name="Neoteric-OS/android_device_xiaomi_sepolicy"
+           path="device/xiaomi/sepolicy" remote="github" revision="bka" />
+  <!-- Official Xiaomi kernel SOURCE for aurora also exists (aurora-u-oss, Linux 6.1 GKI) in this
+       project's own mirror — used by the Kernel/configs/aurora-oiw CI variant; the Neoteric
+       -kernel repo above is the prebuilt-kernel path the device tree expects. -->
   <!-- Vendor blobs: pick ONE of the community repos below, or generate vendor/ locally with
        device/xiaomi/aurora/extract-files.sh against your own device/firmware. -->
   <project name="miyqwx-dev/android_vendor_xiaomi_aurora"

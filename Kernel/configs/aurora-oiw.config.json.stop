@@ -1,0 +1,55 @@
+[
+    {
+        "_comment": "OIW cinema kernel for Xiaomi 14 Ultra (aurora) from OFFICIAL Xiaomi OSS source (Linux 6.1 GKI). Disabled (.stop) until the drivers/misc/hwid Kconfig stub step is added to the workflow — see kernel/oiw/aurora/README.md. Config-verified 2026-07-06; compile pending.",
+        "kernelSource": {
+        "name": "aurora-oiw-cinema-kernel_xiaomi_sm8650",
+        "repo": "https://github.com/noods1234/xiaomi_kernel_opensource.git",
+        "branch": "aurora-u-oss",
+        "device": "gki",
+        "defconfig": "gki_defconfig"
+        },
+        "oiwCinemaFragment": "kernel/oiw/aurora/configs/oiw_cinema.config",
+        "toolchains": [
+            {
+                "name": "clang",
+                "url": "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r536225.tar.gz",
+                "binaryEnv": ["./bin"]
+            }
+        ],
+        "enableCcache": true,
+        "params": {
+        "ARCH": "arm64",
+        "CC": "clang",
+            "externalCommands": {
+                "CROSS_COMPILE": "aarch64-linux-gnu-",
+                "CROSS_COMPILE_ARM32": "arm-linux-gnueabi-",
+                "LD": "ld.lld",
+                "AR": "llvm-ar",
+                "NM": "llvm-nm",
+                "OBJCOPY": "llvm-objcopy",
+                "OBJDUMP": "llvm-objdump",
+                "READELF": "llvm-readelf",
+                "OBJSIZE": "llvm-size",
+                "STRIP": "llvm-strip",
+                "LDGOLD": "aarch64-linux-gnu-ld.gold",
+                "LLVM_AR": "llvm-ar",
+                "LLVM_DIS": "llvm-dis",
+                "LTO": "thin"
+            }
+        },
+        "AnyKernel3": {
+            "use": true,
+            "release": false,
+            "custom": {
+                "repo": "https://github.com/WildPlusKernel/AnyKernel3.git",
+                "branch": "gki-2.0"
+            }
+        },
+        "enableLXC": false,
+        "enableKernelSU": true,
+        "KernelSUSFS": {
+            "enable": true,
+            "branches": "gki-android14-6.1"
+        }
+    }
+]
