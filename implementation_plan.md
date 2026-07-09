@@ -93,8 +93,8 @@ have no code dependency — only a documentation cross-reference.
       on writing and profiling a GPU shader, which is a distinct, schedulable unit of work.
 - [x] LUT parsing + trilinear sampling (`CubeLutParser`, unit-tested). **On-preview application is NOT built**
       — needs the GL shader path (same GPU work item as waveform below). Previously over-marked as done.
-- [ ] Anamorphic desqueeze preview toggle — **not implemented** (needs `TextureView.setTransform` wiring).
-      Previously over-marked as done.
+- [x] Anamorphic desqueeze preview — implemented in the burn-down pass (`CameraActivity.applyDesqueeze`,
+      `TextureView.setTransform` from the profile's squeeze factor; preview-only, recorded geometry untouched).
 - [x] Frame guides / safe area overlays.
 
 ## Phase 7 — Reliability

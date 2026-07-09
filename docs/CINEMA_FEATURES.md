@@ -16,14 +16,14 @@ settings), bottom bar (audio meters/timecode/dropped-frames/LUT state/stabilizat
 | Histogram | Implemented | Real luma histogram computed from `ImageReader` YUV planes |
 | Zebra | Implemented | Real luma-threshold overlay, threshold configurable 0–255 |
 | Focus peaking | Implemented | Real Sobel-edge-magnitude overlay on luma plane |
-| False color | **Not implemented** (stub-audit correction — no FalseColorOverlay class exists yet; same pattern as ZebraOverlay, small task) | Planned: luma→color IRE-banded mapping |
+| False color | Implemented (burn-down pass: `FalseColorOverlay`, IRE-banded, unit-tested, rendered by `OverlayView`, off by default per profile) | Standard exposure-band convention |
 | Waveform (luma) | **Phased**, not in this pass — see `implementation_plan.md` Phase 6 for the concrete GPU-compute plan | Needs a shader-based column-histogram accumulation to hit frame rate; CPU-only implementation was prototyped and is too slow (>80ms/frame at 1080p on this SoC tier in early testing assumptions) to be usable live |
 | RGB parade | **Phased**, same blocker as waveform | Same GPU shader, per-channel |
 | Vectorscope | **Phased**, same blocker | Same GPU shader, polar histogram |
 | LUT preview | **Parser/sampler implemented; on-preview GL shader NOT built** (stub-audit correction) | `.cube` parser + trilinear sampling are real and unit-tested; applying to the preview needs the GL pipeline |
-| Anamorphic desqueeze preview | **Not implemented** (stub-audit correction) | Plan: non-uniform `TextureView.setTransform`; never affects recorded geometry |
+| Anamorphic desqueeze preview | Implemented (burn-down pass: non-uniform `TextureView.setTransform` from profile squeeze) | Preview-only; recorded geometry untouched |
 | Frame guides / safe area | Implemented | Configurable aspect-ratio and title/action-safe overlay boxes |
-| Dropped-frame indicator | **Counter implemented in `Recorder`; UI indicator not wired** (stub-audit correction) | Listener body currently empty in `CaptureSessionCoordinator` |
+| Dropped-frame indicator | Implemented (burn-down pass: counter + status-bar indicator + explicit warning message) | |
 | Rolling/remaining record time | Implemented | From current bitrate × free space, updated every 2s |
 | Write-speed indicator | Implemented | Rolling average of bytes written / wall time from the segment writer |
 | Thermal headroom indicator | Implemented | Derived from `ThermalMonitor` mode + trend (see `docs/THERMAL_POWER.md`) |
