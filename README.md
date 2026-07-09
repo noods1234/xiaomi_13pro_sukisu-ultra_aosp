@@ -6,6 +6,13 @@ This is a repo for building kernel for Xiaomi 13 Pro (nuwa) with SukiSU, SUSFS a
 
 ## One Inch Wonder (OIW-ROM) — Cinema Camera Layer
 
+> **Primary target retargeted to Xiaomi 14 Ultra (`aurora`, SM8650) — 2026-07-06.** The 13 Pro's USB 2.0
+> port has no DP alt mode (hardware wall for clean external monitoring). The 14 Ultra keeps the namesake
+> 1-inch-type sensor (Sony LYT-900) **and** adds USB 3.2 with DisplayPort Alt Mode → native wired clean-feed
+> monitoring, plus USB 3.x external-SSD bandwidth. See `manifests/oiw_aurora.xml` (verified maintainer trees;
+> no official-LineageOS/TheMuppets aurora line exists — pin branches at sync). Everything nuwa-specific below
+> remains valid as the **legacy/secondary target**; the OIW apps/configs/tools are device-agnostic.
+
 This repository also hosts **One Inch Wonder (OIW-ROM)**: a cinema-camera-first software layer built on top of this
 project's rooted GKI kernel (SukiSU Ultra) and the Xiaomi 13 Pro's (nuwa) stock HyperOS firmware and Sony IMX989
 1"-type main sensor. OIW-ROM turns the phone into a purpose-built pocket cinema camera: manual capture app, camera-first

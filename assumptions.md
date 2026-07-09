@@ -47,3 +47,11 @@ Confidence: **High** (verified from repo/public source), **Medium** (industry-st
 - We do **not** disable verified boot or SELinux enforcement in any release-tagged build variant.
 - We do **not** redistribute any Xiaomi/Qualcomm proprietary vendor blob; `vendor/oiw/nuwa/extract-files.sh` only
   extracts from a device the user owns, locally.
+
+## E. Aurora retarget (2026-07-06)
+
+| ID | Assumption | Confidence | Risk if wrong | User must confirm |
+|---|---|---|---|---|
+| E-1 | Primary target is now **Xiaomi 14 Ultra (`aurora`, SM8650 "pineapple")**: keeps a 1-inch-type main sensor (Sony LYT-900) and adds USB 3.2 + **DisplayPort Alt Mode** (confirmed for the 14 series via community sources), solving the nuwa DP/external-SSD bandwidth walls. nuwa remains the legacy target. | High (DP for 14 series confirmed; exact 14 Ultra port behavior verify-on-device) | Monitoring plan falls back to the nuwa workarounds (UVC webcam mode/scrcpy/cast), which still work on aurora. | Plug a USB-C→HDMI/DP cable into a 14 Ultra and confirm external display output. |
+| E-2 | Aurora has **no official LineageOS tree and no TheMuppets blobs** (searched: 0 results). Verified maintainer chain: `Neoteric-OS/android_device_xiaomi_aurora` @ `bka` (active; BoardConfig/aurora.mk/pineapple.mk/extract-files.sh present) + companion `aurora-kernel` repo; community vendor repos `miyqwx-dev/android_vendor_xiaomi_aurora`, `DagobertX/android_vendor_xiaomi_aurora`; alternates `xiaomi-8560`, `HurtCopain`. | High for existence; Medium for branch stability (maintainer trees track their parent ROM's cadence) | Manifest branches may need re-pinning at sync time — `manifests/oiw_aurora.xml` documents this explicitly. | `repo sync` with `oiw_aurora.xml`, pin exact commits, record in bring-up notes. |
+| E-3 | Aurora capability facts (RAW_SENSOR, high-speed modes, encoder 10-bit, thermal zones) are UNKNOWN until `tools/camera_capability_dump.py` + benchmarks run on a real 14 Ultra — do not port nuwa numbers. | High | Profiles ship device-agnostic and are preflight-gated anyway. | Run the Phase 1 recon suite on aurora hardware. |

@@ -76,7 +76,11 @@ See `docs/AUDIO_TIMECODE.md`.
 
 ## 7. External monitor behavior
 
-- **Clean HDMI/DP-Alt-Mode output: CONFIRMED NOT POSSIBLE on this hardware** — the Xiaomi 13 Pro's USB-C port is
+- **PRIMARY TARGET (aurora / Xiaomi 14 Ultra, retarget 2026-07-06): native DP Alt Mode IS available** — USB 3.2
+  port with DisplayPort Alt Mode (14-series confirmed; verify on-unit per `assumptions.md` E-1). OIWCamera's
+  `Presentation`-based clean-feed/overlay-feed modes run natively on the wired external display, and USB 3.x also
+  lifts the external-SSD bandwidth ceiling. The rest of this section documents the **legacy nuwa target**:
+- **nuwa (13 Pro) — clean HDMI/DP-Alt-Mode output: CONFIRMED NOT POSSIBLE on that hardware** — the Xiaomi 13 Pro's USB-C port is
   USB 2.0 with no DP Alt Mode wiring (`assumptions.md` A-5, verified against community sources 2026-07-06; the 13
   Ultra was Xiaomi's first DP-alt-mode phone). This is a hardware limit, so instead of a dead end, the design ships
   three real workarounds:
