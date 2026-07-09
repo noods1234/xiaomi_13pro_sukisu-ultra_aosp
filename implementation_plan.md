@@ -56,7 +56,24 @@ have no code dependency — only a documentation cross-reference.
 ## Phase 5 — OIWCamera MVP
 
 - [x] Preview + manual control panel skeleton.
-- [x] Recording pipeline: Camera2 → MediaCodec → MediaMuxer with synchronized A/V tracks (`Recorder` + `AudioCapture`), full session wiring (`CaptureSessionCoordinator`), DNG stills (`DngStillCaptor`), overlay compositor (`OverlayView`), launcher status writer, CSV exporter.
+- [x] Recording pipeline core: Camera2 → MediaCodec → MediaMuxer with synchronized A/V tracks (`Recorder` +
+      `AudioCapture`), session wiring (`CaptureSessionCoordinator`), overlay compositor (`OverlayView`).
+- [ ] **Stub audit 2026-07-06 — written but NOT yet wired into the recording flow** (each is a small,
+      concrete wiring task, not missing functionality): sidecar write on segment finalize (`MetadataWriter`
+      exists, no caller); dropped-frame + audio-meter UI indicators (listener bodies empty); segment rollover
+      trigger (`rolloverSegmentIfNeeded` never called — needs a byte/time tick); storage preflight gate before
+      record start (`preflight` never called); thermal graceful-stop loop (`ThermalMonitor.decide` never polled
+      during recording); `StatusFileWriter`, `RecordingService` (lock-screen recording), `DngStillCaptor` (no
+      still-button flow), `ExternalControlServer` (no `CommandHandler` impl / not instantiated); still + profile
+      buttons have no onClick; button-mapping JSON not loaded (no KeyEvent interception); `TotalCaptureResult`
+      sampling not wired (`onCaptureResultSample` never invoked); `writerQueue` field is vestigial (drain loop
+      writes directly — remove or implement the bounded queue).
+- [ ] **Known bug (found in stub audit):** media root resolves to `/sdcard/Android/data/OIW_MEDIA`
+      (`getExternalFilesDir(null).parentFile.parentFile`), not the documented `/sdcard/OIW_MEDIA` — and
+      Android 11+ blocks cross-app reads of `Android/data`, so OIWLauncher cannot read the status file there.
+      Fix: use `Environment.getExternalStorageDirectory()`-rooted `OIW_MEDIA` via MediaStore/SAF, or move the
+      status handshake to a `ContentProvider`. Affects `StorageManager`, `StatusFileWriter`,
+      `LauncherStatusReader`, `ProfileRepository` user-profile dir.
 - [x] Capture profile loader/schema.
 - [x] JSON sidecar metadata writer.
 - [ ] **User action:** field-test one full capture profile end to end on real hardware and confirm no dropped frames
@@ -72,8 +89,10 @@ have no code dependency — only a documentation cross-reference.
       compute shader or Vulkan compute pipeline) to hit frame rate on preview-resolution frames. Implementation plan
       is written in `docs/CINEMA_FEATURES.md` §Monitoring Tools; this is not "future work" hand-waving — it is gated
       on writing and profiling a GPU shader, which is a distinct, schedulable unit of work.
-- [x] LUT preview (`.cube` parser + 3D LUT sampling on preview, never baked into recorded file).
-- [x] Anamorphic desqueeze preview toggle.
+- [x] LUT parsing + trilinear sampling (`CubeLutParser`, unit-tested). **On-preview application is NOT built**
+      — needs the GL shader path (same GPU work item as waveform below). Previously over-marked as done.
+- [ ] Anamorphic desqueeze preview toggle — **not implemented** (needs `TextureView.setTransform` wiring).
+      Previously over-marked as done.
 - [x] Frame guides / safe area overlays.
 
 ## Phase 7 — Reliability

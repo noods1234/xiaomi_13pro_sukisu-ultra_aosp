@@ -16,21 +16,21 @@ settings), bottom bar (audio meters/timecode/dropped-frames/LUT state/stabilizat
 | Histogram | Implemented | Real luma histogram computed from `ImageReader` YUV planes |
 | Zebra | Implemented | Real luma-threshold overlay, threshold configurable 0–255 |
 | Focus peaking | Implemented | Real Sobel-edge-magnitude overlay on luma plane |
-| False color | Implemented | Real luma→color LUT mapping (IRE-banded, standard false-color convention) |
+| False color | **Not implemented** (stub-audit correction — no FalseColorOverlay class exists yet; same pattern as ZebraOverlay, small task) | Planned: luma→color IRE-banded mapping |
 | Waveform (luma) | **Phased**, not in this pass — see `implementation_plan.md` Phase 6 for the concrete GPU-compute plan | Needs a shader-based column-histogram accumulation to hit frame rate; CPU-only implementation was prototyped and is too slow (>80ms/frame at 1080p on this SoC tier in early testing assumptions) to be usable live |
 | RGB parade | **Phased**, same blocker as waveform | Same GPU shader, per-channel |
 | Vectorscope | **Phased**, same blocker | Same GPU shader, polar histogram |
-| LUT preview | Implemented | `.cube` (17/33/65-point) parser, trilinear sampling, preview-only overlay via GL shader on the preview `TextureView` |
-| Anamorphic desqueeze preview | Implemented | Non-uniform scale on preview `TextureView`; toggle only, never affects recorded frame geometry |
+| LUT preview | **Parser/sampler implemented; on-preview GL shader NOT built** (stub-audit correction) | `.cube` parser + trilinear sampling are real and unit-tested; applying to the preview needs the GL pipeline |
+| Anamorphic desqueeze preview | **Not implemented** (stub-audit correction) | Plan: non-uniform `TextureView.setTransform`; never affects recorded geometry |
 | Frame guides / safe area | Implemented | Configurable aspect-ratio and title/action-safe overlay boxes |
-| Dropped-frame indicator | Implemented | Counts `MediaCodec.Callback#onError` + timestamp-gap detection between consecutive encoder output buffers |
+| Dropped-frame indicator | **Counter implemented in `Recorder`; UI indicator not wired** (stub-audit correction) | Listener body currently empty in `CaptureSessionCoordinator` |
 | Rolling/remaining record time | Implemented | From current bitrate × free space, updated every 2s |
 | Write-speed indicator | Implemented | Rolling average of bytes written / wall time from the segment writer |
 | Thermal headroom indicator | Implemented | Derived from `ThermalMonitor` mode + trend (see `docs/THERMAL_POWER.md`) |
 | Audio meters | Implemented | Peak + RMS from `AudioRecord` buffer, dBFS scale |
 | Clipping indicator | Implemented | Audio: sample-value clipping count; Video: histogram bins at 0/255 |
-| Timecode display | Implemented (Tier 1–3, see `docs/AUDIO_TIMECODE.md`) | |
-| Slate metadata screen | Implemented | Project/scene/shot/take/lens fields, written to sidecar |
+| Timecode display | **Schema-ready only** (stub-audit correction): sidecar fields exist, no on-screen TC or marker capture wired | Tiers per `docs/AUDIO_TIMECODE.md` |
+| Slate metadata screen | **Sidecar fields exist; no slate UI yet** (stub-audit correction) | Fields in `MetadataWriter.ClipMetadata` are real; the entry screen is unbuilt |
 
 ## 3. Button mappings
 
