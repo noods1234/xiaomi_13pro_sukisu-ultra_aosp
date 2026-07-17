@@ -5,14 +5,32 @@ Every test below is either **automated** (unit/instrumented test in the app's te
 
 ## 1. Unit tests
 
+**Audited 2026-07-06 by real compile + run** (not just "written"): the pure-JVM logic classes and
+their tests were compiled with the Kotlin 1.9.24 compiler and executed on JDK 21 in a
+minimal-Android-shim harness (real API signatures for the few leaf symbols — `Color.argb`,
+`PowerManager.THERMAL_STATUS_*`). **Result: 11 files compile clean (0 errors), 16 tests pass.** The
+Android-framework-heavy classes (Recorder, CaptureSessionCoordinator, CameraActivity, …) can't run
+in that harness and are gated on the first real `./gradlew` build on a machine with the Android SDK.
+
 | Test | Status |
 |---|---|
-| `CaptureProfile` JSON (de)serialization against schema | Implemented (`app/src/test/`) |
-| Kelvin→RGB gain approximation (WB math) | Implemented |
-| `.cube` LUT parser (17/33/65-point, malformed-file handling) | Implemented |
-| Metadata sidecar atomic-write logic (temp-file+rename) | Implemented |
-| Thermal-mode selection state machine (pure function over status enum) | Implemented |
-| Storage preflight bitrate-vs-benchmark comparison logic | Implemented |
+| `CaptureProfile` shutter-angle/speed math + Gson round-trip | **Compiled + passing** |
+| `.cube` LUT parser (identity sample, malformed-file rejection) | **Compiled + passing** |
+| `CsvExporter` (defaults, dot-path resolution, RFC-4180 quoting, non-csv rejection) | **Compiled + passing** |
+| `FalseColorOverlay` (IRE band edges, distinct black/white mapping) | **Compiled + passing** |
+| `ThermalMonitor` decision matrix (force-stop vs warn vs continue per mode) | **Compiled + passing** |
+| `HistogramOverlay` (binning with i+=4 sampling, clip-fraction) | **Compiled + passing (new)** |
+| `ZebraOverlay` (high/low threshold masking) | **Compiled + passing (new)** |
+| `FocusPeakingOverlay` (Sobel edge fires; flat area quiet; threshold gates) | **Compiled + passing (new)** |
+| Kelvin→RGB gain math (`CameraController`) | Written; not in the pure harness (file is Android-heavy) — verify at `gradlew test` |
+| Metadata sidecar atomic-write (`MetadataWriter`) | Compiles in the pure set; I/O behavior verify on device |
+
+### Bug found and fixed during this audit
+Careful review of `Recorder` (not compilable in the harness) found a real defect: segment rollover
+happened **after** writing the triggering keyframe, so each new segment began on P-frames and was not
+independently decodable until the next GOP. Fixed to roll **before** writing a keyframe
+(`rolloverBeforeKeyframeLocked`), so every segment starts self-contained (verified the new muxer
+re-adds the track from the saved output format, which carries the codec config/SPS-PPS-VPS).
 
 ## 2. Build tests
 

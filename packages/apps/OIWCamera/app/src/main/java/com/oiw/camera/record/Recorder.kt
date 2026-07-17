@@ -80,20 +80,22 @@ class Recorder(
     }
 
     /**
-     * Rolls to a new segment file when size/time thresholds hit (docs/STORAGE_MEDIA.md #5).
-     * Called from the drain loop after each video sample write (stub-audit fix: previously never
-     * invoked). Only rolls on a keyframe boundary so the new segment starts decodable.
+     * Rolls to a new segment file when size/time thresholds are hit (docs/STORAGE_MEDIA.md #5).
+     * MUST be called BEFORE writing an incoming keyframe (not after): the new segment has to *begin*
+     * with that keyframe, or it starts on P-frames and isn't independently decodable until the next
+     * GOP. Returns true if a roll happened, so the caller writes the triggering keyframe into the
+     * fresh segment. Caller holds muxerLock; finalize/start re-acquire it reentrantly.
      */
-    private fun rolloverSegmentIfNeeded(isKeyframe: Boolean) {
-        if (!isKeyframe) return
+    private fun rolloverBeforeKeyframeLocked(isKeyframe: Boolean): Boolean {
+        if (!isKeyframe) return false
         val elapsed = System.nanoTime() - segmentStartNanos
-        if (bytesThisSegment >= segmentMaxBytes || elapsed >= segmentMaxNanos) {
-            finalizeCurrentSegment()
-            segmentIndex += 1
-            segmentStartNanos = System.nanoTime()
-            bytesThisSegment = 0
-            startNewMuxerSegment()
-        }
+        if (bytesThisSegment < segmentMaxBytes && elapsed < segmentMaxNanos) return false
+        finalizeCurrentSegment()
+        segmentIndex += 1
+        segmentStartNanos = System.nanoTime()
+        bytesThisSegment = 0
+        startNewMuxerSegment()
+        return true
     }
 
     private fun startNewMuxerSegment() {
@@ -164,10 +166,15 @@ class Recorder(
                 }
                 outputIndex >= 0 -> {
                     val encodedData = codec.getOutputBuffer(outputIndex)
+                    val isKeyframe = (bufferInfo.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0
+                    val isConfig = (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
                     synchronized(muxerLock) {
+                        // Roll to a new file BEFORE writing this keyframe, so the new segment begins
+                        // with a keyframe (independently decodable). No-op for non-keyframes.
+                        if (!isConfig) rolloverBeforeKeyframeLocked(isKeyframe)
                         val currentMuxer = muxer
                         if (encodedData != null && muxerStarted && currentMuxer != null &&
-                            bufferInfo.size > 0 && (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0
+                            bufferInfo.size > 0 && !isConfig
                         ) {
                             try {
                                 currentMuxer.writeSampleData(videoTrackIndex, encodedData, bufferInfo)
@@ -180,7 +187,6 @@ class Recorder(
                         }
                     }
                     codec.releaseOutputBuffer(outputIndex, false)
-                    rolloverSegmentIfNeeded((bufferInfo.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0)
                 }
                 // outputIndex == INFO_TRY_AGAIN_LATER: expected on timeout, nothing to do.
             }
