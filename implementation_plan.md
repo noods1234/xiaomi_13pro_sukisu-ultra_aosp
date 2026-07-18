@@ -73,7 +73,7 @@ have no code dependency — only a documentation cross-reference.
       (single source of truth), `MANAGE_EXTERNAL_STORAGE` declared + Settings-intent request flow; launcher
       reads status through the new permission-free `StatusProvider` ContentProvider (file fallback kept).
 - [ ] Remaining honest gaps: DNG still needs a RAW-stream session variant (still button reports this
-      explicitly); YUV still capture not built; `ExternalControlServer` has no `CommandHandler` binding into
+      explicitly); YUV still capture not built; LTC timecode decode/encode now implemented+tested (`audio/`); `ExternalControlServer` still has no `CommandHandler` binding into
       the coordinator yet (class complete, instantiation pending a Settings toggle UI); LUT-on-preview GL
       shader + waveform/vectorscope (GPU work item); slate UI; timecode display.
 - [x] Capture profile loader/schema.

@@ -22,6 +22,10 @@ in that harness and are gated on the first real `./gradlew` build on a machine w
 | `HistogramOverlay` (binning with i+=4 sampling, clip-fraction) | **Compiled + passing (new)** |
 | `ZebraOverlay` (high/low threshold masking) | **Compiled + passing (new)** |
 | `FocusPeakingOverlay` (Sobel edge fires; flat area quiet; threshold gates) | **Compiled + passing (new)** |
+| `LtcTimecode` bit round-trip + drop-frame + sync-word position | **Compiled + passing (new)** |
+| `LtcEncoder`→`LtcDecoder` full-PCM round-trip (recovers consecutive frames, strictly increasing) | **Compiled + passing (new)** |
+
+**Running total: 20 tests pass** (all compiled with Kotlin 1.9.24, run on JDK 21).
 | Kelvin→RGB gain math (`CameraController`) | Written; not in the pure harness (file is Android-heavy) — verify at `gradlew test` |
 | Metadata sidecar atomic-write (`MetadataWriter`) | Compiles in the pure set; I/O behavior verify on device |
 

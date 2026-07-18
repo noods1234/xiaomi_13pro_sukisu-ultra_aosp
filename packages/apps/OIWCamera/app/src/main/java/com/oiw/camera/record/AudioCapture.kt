@@ -35,6 +35,13 @@ class AudioCapture(
     private val running = AtomicBoolean(false)
     private var thread: Thread? = null
 
+    /**
+     * Optional raw-PCM tap for timecode: when set, each captured buffer is handed to this sink
+     * before AAC encoding. Wire it to an [com.oiw.camera.audio.LtcDecoder] to recover LTC from a
+     * house signal on the mic/USB input (docs/AUDIO_TIMECODE.md Tier 4). Null by default — no cost.
+     */
+    var pcmSink: ((ShortArray, Int) -> Unit)? = null
+
     @SuppressLint("MissingPermission") // RECORD_AUDIO checked by CameraActivity before start.
     fun start(preferredDeviceId: Int? = null) {
         if (running.getAndSet(true)) return
@@ -78,6 +85,7 @@ class AudioCapture(
         while (running.get()) {
             val read = record.read(pcm, 0, pcm.size)
             if (read <= 0) continue
+            pcmSink?.invoke(pcm, read) // timecode tap (LTC), before encode; no-op when unset
 
             var peak = 0; var sumSq = 0.0; var clipped = 0
             for (i in 0 until read) {
