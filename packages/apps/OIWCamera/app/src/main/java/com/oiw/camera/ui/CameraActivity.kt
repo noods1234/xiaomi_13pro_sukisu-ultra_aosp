@@ -136,9 +136,17 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
         }
     }
 
+    private var analysisThread: android.os.HandlerThread? = null
+
     private fun wireSessionWhenSurfaceReady(profile: CaptureProfile) {
         val controller = cameraController ?: return
+        // AUDIT FIX (H): a re-wire (profile cycle) must tear down the previous session's resources,
+        // or each switch leaks a HandlerThread and stacks another OverlayView on the container.
+        analysisThread?.quitSafely()
+        findViewById<android.widget.FrameLayout>(R.id.overlay_container).removeAllViews()
+
         val analysisThread = android.os.HandlerThread("OIWAnalysis").also { it.start() }
+        this.analysisThread = analysisThread
         val overlay = com.oiw.camera.overlay.OverlayView(this).also {
             it.guideAspect = profile.lensMetadataDefaults?.anamorphicSqueeze?.let { sq -> (16f / 9f * sq.toFloat()) }
                 ?: 2.39f
@@ -146,7 +154,9 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
             findViewById<android.widget.FrameLayout>(R.id.overlay_container).addView(it)
         }
         overlayView = overlay
-        applyDesqueeze(profile)
+        // AUDIT FIX (D): apply desqueeze after the TextureView is laid out, so the pivot uses the
+        // real width (was 0 at wire time, offsetting the stretch instead of centering it).
+        textureView.post { applyDesqueeze(profile) }
 
         val coord = com.oiw.camera.camera.CaptureSessionCoordinator(
             controller,
@@ -229,7 +239,14 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
         val profile = activeProfile ?: return
         if (coord.isRecording) { coord.stopRecording(); return }
         val target = storageManager.projectClipDir("untitled", java.time.LocalDate.now().toString(), "A_CAM", "preflight")
-        val benchmark = storageManager.loadLastBenchmark(profile.storageTarget)
+        // AUDIT FIX C: benchmark on-demand if we don't have one yet, so the default record path works
+        // (previously the benchmark file was never created and recording could never start). Runs a
+        // ~64MB write test off the UI thread; blocks record start until it completes.
+        var benchmark = storageManager.loadLastBenchmark(profile.storageTarget)
+        if (benchmark == null) {
+            showError("Benchmarking ${profile.storageTarget} storage… (first use)")
+            benchmark = storageManager.runAndStoreBenchmark(target, profile.storageTarget)
+        }
         val preflight = storageManager.preflight(target, profile.bitrateBps, benchmark)
         if (!preflight.ok) {
             showError(preflight.message)
@@ -326,6 +343,11 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
     }
 
     override fun onDestroy() {
+        // AUDIT FIX (G): cancel the thermal poll and release session resources, or the Runnable
+        // leaks the Activity and keeps firing after teardown.
+        window.decorView.removeCallbacks(thermalTick)
+        coordinator?.release()
+        analysisThread?.quitSafely()
         cameraController?.close()
         cameraController?.stopBackgroundThread()
         super.onDestroy()

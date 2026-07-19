@@ -82,9 +82,19 @@ class AudioCapture(
         val enc = codec ?: return
         val pcm = ShortArray(4096)
         val info = MediaCodec.BufferInfo()
+        // AUDIT FIX (A): derive AAC PTS from a monotonic sample counter anchored at the first buffer,
+        // not System.nanoTime() at each read. Per-read nanoTime folds the audio buffer latency into a
+        // jittery, uneven PTS; a sample counter gives exactly-spaced, drift-free timestamps.
+        // NOTE (honest, hardware-gated): this anchors to nanoTime, which matches the camera encoder
+        // surface clock only when SENSOR_INFO_TIMESTAMP_SOURCE == UNKNOWN (monotonic). On REALTIME-
+        // source devices, video uses CLOCK_BOOTTIME and A/V will need a measured offset — flagged in
+        // docs/AUDIO_TIMECODE.md §6 as a device bring-up check, not silently assumed correct.
+        var anchorUs = -1L
+        var framesEmitted = 0L
         while (running.get()) {
             val read = record.read(pcm, 0, pcm.size)
             if (read <= 0) continue
+            if (anchorUs < 0) anchorUs = System.nanoTime() / 1000
             pcmSink?.invoke(pcm, read) // timecode tap (LTC), before encode; no-op when unset
 
             var peak = 0; var sumSq = 0.0; var clipped = 0
@@ -103,7 +113,9 @@ class AudioCapture(
                 val buf = enc.getInputBuffer(inIndex) ?: continue
                 buf.clear()
                 buf.asShortBuffer().put(pcm, 0, read)
-                enc.queueInputBuffer(inIndex, 0, read * 2, System.nanoTime() / 1000, 0)
+                val ptsUs = anchorUs + framesEmitted * 1_000_000L / sampleRate
+                enc.queueInputBuffer(inIndex, 0, read * 2, ptsUs, 0)
+                framesEmitted += read / channelCount // frames = shorts / channels
             }
             var outIndex = enc.dequeueOutputBuffer(info, 0)
             while (outIndex >= 0 || outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {

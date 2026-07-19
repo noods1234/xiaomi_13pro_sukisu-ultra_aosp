@@ -201,6 +201,24 @@ class CameraController(
         builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
         builder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, clampedExposure)
         builder.set(CaptureRequest.SENSOR_SENSITIVITY, clampedIso)
+
+        // AUDIT FIX (B): lock the sensor frame duration to the profile's frame rate. Without this,
+        // with AE off the sensor runs at an undefined/default cadence — a 24p cinema profile could
+        // capture at ~30fps, giving the wrong motion cadence. Frame duration must also be >= the
+        // requested exposure time (you can't expose longer than the frame period). Clamp to the
+        // sensor's max frame duration if reported.
+        val targetFrameDuration = 1_000_000_000L / profile.frameRateFps
+        val maxFrameDuration = characteristics.get(CameraCharacteristics.SENSOR_INFO_MAX_FRAME_DURATION)
+            ?: Long.MAX_VALUE
+        val frameDuration = maxOf(targetFrameDuration, clampedExposure).coerceAtMost(maxFrameDuration)
+        builder.set(CaptureRequest.SENSOR_FRAME_DURATION, frameDuration)
+        if (frameDuration != targetFrameDuration) {
+            listener.onError(
+                "Frame duration adjusted to ${frameDuration}ns (target ${targetFrameDuration}ns for " +
+                    "${profile.frameRateFps}fps) to satisfy exposure/sensor limits — verify capture cadence."
+            )
+        }
+
         builder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_OFF)
         builder.set(CaptureRequest.COLOR_CORRECTION_MODE, CaptureRequest.COLOR_CORRECTION_MODE_TRANSFORM_MATRIX)
         builder.set(CaptureRequest.COLOR_CORRECTION_GAINS, kelvinToGains(profile.whiteBalanceKelvin, profile.tint))

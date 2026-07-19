@@ -29,10 +29,13 @@ class StorageManager(private val context: Context) {
         val freeBytes = statFs.availableBytes
         val requiredMbps = requiredBitrateBps / 1_000_000.0
         if (lastBenchmark == null) {
+            // Pure comparison stays pure: with no benchmark data we cannot certify the target, so we
+            // refuse. The CALLER is responsible for running runAndStoreBenchmark() first so this
+            // branch isn't hit in the normal flow (AUDIT FIX C — previously nothing ever wrote the
+            // benchmark file the app reads, so recording could never start).
             return PreflightResult(
                 false,
-                "No storage write-speed benchmark on file for ${targetDir.absolutePath}. " +
-                    "Run tools/storage_benchmark.sh before enabling this profile.",
+                "No write-speed benchmark yet for ${targetDir.absolutePath}; run one before this profile.",
                 freeBytes,
                 0,
             )
@@ -77,6 +80,43 @@ class StorageManager(private val context: Context) {
                 sampleSizeBytes = obj.get("sampleSizeBytes")?.asLong ?: 0L,
             )
         }.getOrNull()
+    }
+
+    /**
+     * Real in-app sustained-write benchmark (AUDIT FIX C): writes a temp file to [targetDir]'s
+     * filesystem, measures MB/s, stores the result at benchmarks/<target>.json (same location
+     * loadLastBenchmark reads), and returns it. Uses buffered writes + fsync so the number reflects
+     * media, not page cache. Deletes the temp file. Returns null on I/O failure.
+     */
+    fun runAndStoreBenchmark(targetDir: File, target: String, sizeMb: Int = 64): BenchmarkResult? {
+        if (!targetDir.exists() && !targetDir.mkdirs()) return null
+        val tmp = File(targetDir, ".oiw_bench.tmp")
+        val bytes = sizeMb.toLong() * 1024 * 1024
+        val chunk = ByteArray(1 * 1024 * 1024)
+        return try {
+            val start = System.nanoTime()
+            java.io.FileOutputStream(tmp).use { fos ->
+                var written = 0L
+                while (written < bytes) {
+                    fos.write(chunk)
+                    written += chunk.size
+                }
+                fos.flush()
+                fos.fd.sync()
+            }
+            val elapsedS = (System.nanoTime() - start) / 1_000_000_000.0
+            val mbps = if (elapsedS > 0) (bytes / 1_000_000.0) / elapsedS else 0.0
+            tmp.delete()
+            val result = BenchmarkResult(sustainedWriteMbps = mbps, sampleSizeBytes = bytes)
+            val benchDir = com.oiw.camera.util.OiwPaths.benchmarksDir().apply { mkdirs() }
+            File(benchDir, "$target.json").writeText(
+                """{"sustainedWriteMbps":$mbps,"sampleSizeBytes":$bytes}"""
+            )
+            result
+        } catch (e: Exception) {
+            tmp.delete()
+            null
+        }
     }
 
     /** Detected via the public StorageVolume API — no custom USB mass-storage driver logic here. */
