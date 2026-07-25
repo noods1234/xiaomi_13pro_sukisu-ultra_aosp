@@ -70,7 +70,7 @@ class ExternalControlServer(
                     continue
                 }
                 if (!authenticated) {
-                    if (msg?.token == pairingToken) {
+                    if (msg?.token != null && tokensMatch(msg.token, pairingToken)) {
                         authenticated = true
                         writer.write(gson.toJson(mapOf("ok" to "paired"))); writer.newLine(); writer.flush()
                         if (msg.cmd == null) continue
@@ -96,6 +96,11 @@ class ExternalControlServer(
         runCatching { serverSocket?.close() }
         acceptThread?.join(1_000)
     }
+
+    // AUDIT FIX (L): constant-time token comparison so response timing can't leak how many leading
+    // bytes matched. MessageDigest.isEqual is constant-time for equal-length inputs on modern JDKs.
+    private fun tokensMatch(a: String, b: String): Boolean =
+        java.security.MessageDigest.isEqual(a.toByteArray(Charsets.UTF_8), b.toByteArray(Charsets.UTF_8))
 
     companion object {
         val KNOWN_COMMANDS = setOf(

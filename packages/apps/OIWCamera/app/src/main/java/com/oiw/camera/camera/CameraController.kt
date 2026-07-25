@@ -99,16 +99,21 @@ class CameraController(
             cont.resume(false)
             return@suspendCoroutine
         }
+        // AUDIT FIX (K): a suspendCoroutine may be resumed only once. Some vendor HALs deliver
+        // onError AFTER onOpened (or onError then onDisconnected); guard so we never double-resume
+        // (which throws IllegalStateException and crashes the open path).
+        val resumed = java.util.concurrent.atomic.AtomicBoolean(false)
         manager.openCamera(cameraId, object : CameraDevice.StateCallback() {
             override fun onOpened(cameraDevice: CameraDevice) {
                 device = cameraDevice
-                cont.resume(true)
+                if (resumed.compareAndSet(false, true)) cont.resume(true)
             }
 
             override fun onDisconnected(cameraDevice: CameraDevice) {
                 listener.onError("Camera $cameraId disconnected.")
                 cameraDevice.close()
                 device = null
+                if (resumed.compareAndSet(false, true)) cont.resume(false)
             }
 
             override fun onError(cameraDevice: CameraDevice, error: Int) {
@@ -118,7 +123,7 @@ class CameraController(
                 )
                 cameraDevice.close()
                 device = null
-                cont.resume(false)
+                if (resumed.compareAndSet(false, true)) cont.resume(false)
             }
         }, backgroundHandler)
     }

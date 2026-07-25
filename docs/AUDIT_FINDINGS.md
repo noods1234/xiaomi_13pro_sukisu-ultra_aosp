@@ -19,9 +19,9 @@ Severity: **High** (blocks or corrupts core function), **Medium** (wrong behavio
 | # | Sev | Finding | Plan |
 |---|---|---|---|
 | I | Medium | The on-first-use benchmark (fix C) runs on the **UI thread** in `toggleRecording` (~1 s stall on a 64 MB write). Functionally correct, bad UX. | Move to a coroutine on `Dispatchers.IO`; show a spinner. |
-| J | Medium | `LtcEncoder`/`LtcDecoder` require `sampleRate % (fps*80) == 0`, so **44100 Hz and 29.97 drop-frame are rejected**. Real devices default to 44100. | Add fractional-bit-clock handling (accumulate sample-phase) — the decoder's interval classifier already tolerates non-integer `samplesPerBit`; the encoder needs the same. |
-| K | Low | `CameraController.open()` resumes its coroutine in `onOpened`; if `onError` fires *after* `onOpened` (rare vendor HAL behavior) it would resume twice → `IllegalStateException`. | Guard with an `AtomicBoolean resumed`. |
-| L | Low | `ExternalControlServer` compares the pairing token with `==` (not constant-time). Local socket, low value, but a timing side-channel exists. | `MessageDigest.isEqual` on token bytes. |
+| ~~J~~ | Medium | **FIXED.** `LtcEncoder` rewritten with phase-accurate fractional bit timing (anchored to a global bit counter, drift-free); encoder/decoder `frameRate` is now `Double`. Round-trip tests pass at 44100/25, 44100/30, and 48000/29.97 drop-frame. |
+| ~~K~~ | Low | **FIXED.** `open()` guards all three StateCallback paths with an `AtomicBoolean` (also fixes a latent hang: `onDisconnected` during open never resumed the coroutine before). |
+| ~~L~~ | Low | **FIXED.** Pairing token compared with `MessageDigest.isEqual` (constant-time). Verified compiles in the pure-logic harness. |
 | M | Low | `StatusProvider` is `exported=true` with no permission — any app can read storage/thermal/battery/profile summary. Non-sensitive by design, but it is world-readable. | Acceptable for v1; documented. Could gate behind a signature permission shared with OIWLauncher. |
 | N | Low | `kelvinToGains` is a coarse approximation (documented as such), not colorimetrically validated; green channel handling is simplistic. | Validate against a gray card on real hardware (Phase 1 recon); consider a measured per-sensor matrix. |
 

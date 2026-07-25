@@ -13,10 +13,10 @@ package com.oiw.camera.audio
  */
 class LtcDecoder(
     sampleRate: Int = 48_000,
-    frameRate: Int = 25,
+    frameRate: Double = 25.0,
     private val onFrame: (LtcTimecode) -> Unit,
 ) {
-    private val samplesPerBit: Double = sampleRate.toDouble() / (frameRate * LtcTimecode.BITS_PER_FRAME)
+    private val samplesPerBit: Double = sampleRate / (frameRate * LtcTimecode.BITS_PER_FRAME)
     // Interval <= this is a half-bit ('1' pair); above is a full bit ('0'). Midway between 0.5 and 1.0.
     private val shortMax: Double = samplesPerBit * 0.75
     // Anything longer than this is a dropout/gap — reset the bit assembler rather than emit garbage.

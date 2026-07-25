@@ -27,36 +27,50 @@ class LtcCodecTest {
         assertEquals("01:02:03;04", decoded.toString())
     }
 
-    @Test
-    fun `full signal round trip - encode PCM then decode recovers consecutive timecodes`() {
-        val sampleRate = 48_000
-        val fps = 25
+    /** Encodes [count] consecutive frames to one continuous PCM buffer and returns what decodes back. */
+    private fun roundTrip(sampleRate: Int, fps: Double, count: Int): List<LtcTimecode> {
         val encoder = LtcEncoder(sampleRate, fps)
-        val start = LtcTimecode(10, 20, 30, 0)
-
-        // Encode 6 consecutive frames into one continuous PCM buffer (level carries across frames).
-        val frames = (0 until 6).map { LtcTimecode(start.hours, start.minutes, start.seconds, it) }
-        val pcm = ShortArray(encoder.samplesPerFrame() * frames.size)
+        val chunks = (0 until count).map { encoder.encodeFrame(LtcTimecode(10, 20, 30, it)) }
+        val pcm = ShortArray(chunks.sumOf { it.size })
         var off = 0
-        for (f in frames) {
-            val chunk = encoder.encodeFrame(f)
-            chunk.copyInto(pcm, off); off += chunk.size
-        }
-
+        for (c in chunks) { c.copyInto(pcm, off); off += c.size }
         val decoded = mutableListOf<LtcTimecode>()
         LtcDecoder(sampleRate, fps) { decoded += it }.process(pcm)
+        return decoded
+    }
 
-        // The decoder needs a full frame of history before the first sync; expect >=4 of 6 recovered,
-        // and every recovered frame must match the frame it was encoded from (no bit errors).
-        assertTrue("expected most frames decoded, got ${decoded.size}: $decoded", decoded.size >= 4)
+    private fun assertCleanRun(decoded: List<LtcTimecode>, count: Int, label: String) {
+        assertTrue("$label: expected most of $count frames, got ${decoded.size}: $decoded", decoded.size >= count - 2)
         for (d in decoded) {
-            assertEquals(10, d.hours); assertEquals(20, d.minutes); assertEquals(30, d.seconds)
-            assertTrue("frame ${d.frames} out of encoded range", d.frames in 0..5)
+            assertEquals("$label hours", 10, d.hours)
+            assertEquals("$label minutes", 20, d.minutes)
+            assertEquals("$label seconds", 30, d.seconds)
+            assertTrue("$label frame ${d.frames} out of range", d.frames in 0 until count)
         }
-        // Frames must be strictly increasing in the order recovered.
         for (i in 1 until decoded.size) {
-            assertTrue("frames should increase: ${decoded[i-1].frames} -> ${decoded[i].frames}",
+            assertTrue("$label frames should increase: ${decoded[i-1].frames} -> ${decoded[i].frames}",
                 decoded[i].frames > decoded[i - 1].frames)
         }
+    }
+
+    @Test
+    fun `round trip at 48000 Hz 25 fps (integer bit clock)`() {
+        assertCleanRun(roundTrip(48_000, 25.0, 6), 6, "48k/25")
+    }
+
+    @Test
+    fun `round trip at 44100 Hz 25 fps (fractional 22_05 samples per bit)`() {
+        // AUDIT FIX J: 44100 is the common Android mic default; bit clock is fractional here.
+        assertCleanRun(roundTrip(44_100, 25.0, 8), 8, "44.1k/25")
+    }
+
+    @Test
+    fun `round trip at 44100 Hz 30 fps (fractional 18_375 samples per bit)`() {
+        assertCleanRun(roundTrip(44_100, 30.0, 8), 8, "44.1k/30")
+    }
+
+    @Test
+    fun `round trip at 48000 Hz 29_97 drop frame (fractional fps)`() {
+        assertCleanRun(roundTrip(48_000, 30000.0 / 1001.0, 8), 8, "48k/29.97")
     }
 }
