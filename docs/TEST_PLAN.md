@@ -3,14 +3,29 @@
 Every test below is either **automated** (unit/instrumented test in the app's test source set) or a **user action**
 (requires real hardware; cannot be executed in this environment). Status column reflects what exists in this change.
 
+## 0. Offline verification harness (`tools/verify_compile.sh`)
+
+Runs without the Android SDK (Google Maven is blocked in some environments). Three tiers, ordered
+by strength of evidence — **the tier labels matter, don't conflate them**:
+
+| Tier | What | Strength |
+|---|---|---|
+| 1 | Pure-JVM logic — compiled **and executed** (38 tests) | Strongest |
+| 2 | Compiled against **real** Android API 34 (`org.robolectric:android-all`) — 82 classes | Compiles, never runs |
+| 3 | Compiled against **hand-written androidx/AGP stubs** — 38 classes | Weakest: a wrong stub signature could mask a real error. Report as *plausible*, not *verified*. |
+
+Plus `tools/check_wiring.py`, which fails the build if any `main/` class is referenced only by its
+own tests or by comments — the mechanical guard against the dead-code pattern (finding P).
+
+**What this does NOT prove:** runtime behavior. `./gradlew assembleDebug` on a machine with the
+Android SDK, then a real on-device take, remain the true acceptance gates.
+
 ## 1. Unit tests
 
-**Audited 2026-07-06 by real compile + run** (not just "written"): the pure-JVM logic classes and
-their tests were compiled with the Kotlin 1.9.24 compiler and executed on JDK 21 in a
-minimal-Android-shim harness (real API signatures for the few leaf symbols — `Color.argb`,
-`PowerManager.THERMAL_STATUS_*`). **Result: 11 files compile clean (0 errors), 16 tests pass.** The
-Android-framework-heavy classes (Recorder, CaptureSessionCoordinator, CameraActivity, …) can't run
-in that harness and are gated on the first real `./gradlew` build on a machine with the Android SDK.
+All tier-1 tests below are compiled with Kotlin 1.9.24 and **executed** on JDK 21 by
+`tools/verify_compile.sh` (§0). **Current result: 38 tests pass.** The Android-framework-heavy
+classes are compiled but not executed (tier 2/3) — they are gated on `./gradlew assembleDebug`
+and a real device.
 
 | Test | Status |
 |---|---|
@@ -23,9 +38,11 @@ in that harness and are gated on the first real `./gradlew` build on a machine w
 | `ZebraOverlay` (high/low threshold masking) | **Compiled + passing (new)** |
 | `FocusPeakingOverlay` (Sobel edge fires; flat area quiet; threshold gates) | **Compiled + passing (new)** |
 | `LtcTimecode` bit round-trip + drop-frame + sync-word position | **Compiled + passing (new)** |
-| `LtcEncoder`→`LtcDecoder` full-PCM round-trip (recovers consecutive frames, strictly increasing) | **Compiled + passing (new)** |
+| `LtcEncoder`→`LtcDecoder` full-PCM round-trip at 48k/25, 44.1k/25, 44.1k/30, 48k/29.97 DF | **Compiled + passing** |
+| `WaveformOverlay` (flat/ramp/total-count + 15 ms perf budget) | **Compiled + passing** |
+| `VectorscopeOverlay` (centre/quadrant bias, gamut flag + 10 ms perf budget) | **Compiled + passing** |
+| `ChromaExtraction` (packed, row-padded, **interleaved pixelStride=2**, truncated buffer, e2e feed) | **Compiled + passing** |
 
-**Running total: 20 tests pass** (all compiled with Kotlin 1.9.24, run on JDK 21).
 | Kelvin→RGB gain math (`CameraController`) | Written; not in the pure harness (file is Android-heavy) — verify at `gradlew test` |
 | Metadata sidecar atomic-write (`MetadataWriter`) | Compiles in the pure set; I/O behavior verify on device |
 

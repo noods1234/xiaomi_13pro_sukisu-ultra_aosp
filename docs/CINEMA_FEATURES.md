@@ -17,10 +17,10 @@ settings), bottom bar (audio meters/timecode/dropped-frames/LUT state/stabilizat
 | Zebra | Implemented | Real luma-threshold overlay, threshold configurable 0–255 |
 | Focus peaking | Implemented | Real Sobel-edge-magnitude overlay on luma plane |
 | False color | Implemented (burn-down pass: `FalseColorOverlay`, IRE-banded, unit-tested, rendered by `OverlayView`, off by default per profile) | Standard exposure-band convention |
-| Waveform (luma) | **Implemented (CPU) + benchmarked** — `WaveformOverlay`, column-histogram, unit-tested | **Correction:** the earlier ">80 ms/frame, needs GPU" note was an *unmeasured assumption* and was wrong. Measured **1.33 ms/frame** at 960x540 (quarter-res of 4K) on JVM; a regression test enforces a 15 ms budget. GPU path is an optimization, not a prerequisite. |
-| RGB parade | **Not yet built** (needs the per-channel RGB planes, not just luma) — no longer blocked on GPU, just unwritten | Same column-histogram as `WaveformOverlay`, run per channel |
-| Vectorscope | **Implemented (CPU) + benchmarked** — `VectorscopeOverlay`, U/V density grid + out-of-gamut fraction + center-bias (WB sanity readout), unit-tested | Measured **0.64 ms/frame** on 480x270 chroma; 10 ms budget enforced by test |
-| LUT preview | **Parser/sampler implemented; on-preview GL shader NOT built** (stub-audit correction) | `.cube` parser + trilinear sampling are real and unit-tested; applying to the preview needs the GL pipeline |
+| Waveform (luma) | **Implemented + wired + benchmarked** — `WaveformOverlay` -> `OverlayView`, enabled via a profile's `monitoringOverlays: ["waveform"]` | **Correction:** the earlier ">80 ms/frame, needs GPU" note was an *unmeasured assumption* and was wrong. Measured **1.33 ms/frame** at 960x540 (quarter-res of 4K) on JVM; a regression test enforces a 15 ms budget. GPU path is an optimization, not a prerequisite. |
+| RGB parade | **Not built** — now genuinely cheap: chroma extraction exists, so this is a per-channel reuse of `WaveformOverlay` | Same column-histogram as `WaveformOverlay`, run per channel |
+| Vectorscope | **Implemented + wired + benchmarked** — `VectorscopeOverlay` fed by real chroma extraction (`ChromaExtraction`, pixelStride-aware); density grid + out-of-gamut fraction + centre-bias WB readout; enabled via `monitoringOverlays: ["vectorscope"]` | Measured **0.64 ms/frame** on 480x270 chroma; 10 ms budget enforced by test |
+| LUT preview | **library — not wired.** Parser + trilinear sampling unit-tested; needs the GL shader path (`tools/unwired_allowlist.txt`) | `.cube` parser + trilinear sampling are real and unit-tested; applying to the preview needs the GL pipeline |
 | Anamorphic desqueeze preview | Implemented (burn-down pass: non-uniform `TextureView.setTransform` from profile squeeze) | Preview-only; recorded geometry untouched |
 | Frame guides / safe area | Implemented | Configurable aspect-ratio and title/action-safe overlay boxes |
 | Dropped-frame indicator | Implemented (burn-down pass: counter + status-bar indicator + explicit warning message) | |
@@ -29,7 +29,7 @@ settings), bottom bar (audio meters/timecode/dropped-frames/LUT state/stabilizat
 | Thermal headroom indicator | Implemented | Derived from `ThermalMonitor` mode + trend (see `docs/THERMAL_POWER.md`) |
 | Audio meters | Implemented | Peak + RMS from `AudioRecord` buffer, dBFS scale |
 | Clipping indicator | Implemented | Audio: sample-value clipping count; Video: histogram bins at 0/255 |
-| Timecode display | **Schema-ready only** (stub-audit correction): sidecar fields exist, no on-screen TC or marker capture wired | Tiers per `docs/AUDIO_TIMECODE.md` |
+| Timecode display | **Implemented + wired** — LTC decoded from the audio input (`LtcDecoder` on `AudioCapture.pcmSink`, enabled by `monitoringOverlays: ["timecode"]`) and shown live in the status bar | Tiers per `docs/AUDIO_TIMECODE.md` |
 | Slate metadata screen | **Sidecar fields exist; no slate UI yet** (stub-audit correction) | Fields in `MetadataWriter.ClipMetadata` are real; the entry screen is unbuilt |
 
 ## 3. Button mappings
