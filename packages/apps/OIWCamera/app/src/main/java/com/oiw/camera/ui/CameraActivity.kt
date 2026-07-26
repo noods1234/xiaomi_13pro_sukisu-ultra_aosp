@@ -111,6 +111,10 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
     private val zebra = com.oiw.camera.overlay.ZebraOverlay()
     private val peaking = com.oiw.camera.overlay.FocusPeakingOverlay()
     private val falseColor = com.oiw.camera.overlay.FalseColorOverlay()
+    private val waveform = com.oiw.camera.overlay.WaveformOverlay()
+    private val vectorscope = com.oiw.camera.overlay.VectorscopeOverlay()
+    /** Last LTC timecode decoded from the audio input, if a house signal is present. */
+    @Volatile private var lastLtc: com.oiw.camera.audio.LtcTimecode? = null
     private var overlayView: com.oiw.camera.overlay.OverlayView? = null
     private var buttonMapping: com.oiw.camera.control.ButtonMappingLoader.Mapping? = null
     private var profiles: List<CaptureProfile> = emptyList()
@@ -151,6 +155,8 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
             it.guideAspect = profile.lensMetadataDefaults?.anamorphicSqueeze?.let { sq -> (16f / 9f * sq.toFloat()) }
                 ?: 2.39f
             it.showFalseColor = "false_color" in profile.monitoringOverlays
+            it.showWaveform = "waveform" in profile.monitoringOverlays
+            it.showVectorscope = "vectorscope" in profile.monitoringOverlays
             findViewById<android.widget.FrameLayout>(R.id.overlay_container).addView(it)
         }
         overlayView = overlay
@@ -163,13 +169,28 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
             mainExecutor,
             android.os.Handler(analysisThread.looper),
             object : com.oiw.camera.camera.CaptureSessionCoordinator.Listener {
-                override fun onLumaFrame(luma: com.oiw.camera.overlay.LumaFrame.Luma) {
+                override fun onAnalysisFrame(
+                    luma: com.oiw.camera.overlay.LumaFrame.Luma,
+                    chroma: com.oiw.camera.overlay.VectorscopeOverlay.Chroma?,
+                ) {
+                    // Each scope is computed only when its overlay is enabled — the measured costs
+                    // (1.3 ms waveform / 0.6 ms vectorscope) are cheap but not free.
+                    val wf = if (overlay.showWaveform) {
+                        val counts = waveform.compute(luma)
+                        Triple(counts, waveform.outputSize(), waveform.peak(counts))
+                    } else null
+                    val vs = if (overlay.showVectorscope && chroma != null) {
+                        val grid = vectorscope.compute(chroma)
+                        Triple(grid, vectorscope.outputSize(), grid.max())
+                    } else null
                     overlay.submit(
                         luma,
                         if (overlay.showZebra) zebra.computeMask(luma) else null,
                         if (overlay.showPeaking) peaking.computeMask(luma) else null,
                         histogram.compute(luma),
                         if (overlay.showFalseColor) falseColor.colorize(luma) else null,
+                        wf,
+                        vs,
                     )
                 }
                 override fun onRecordingStateChanged(recording: Boolean) = runOnUiThread {
@@ -194,6 +215,10 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
                         "exp ${exposureNanos?.let { "1/${1_000_000_000 / it.coerceAtLeast(1)}" } ?: "--"} " +
                         "ISO ${isoSensitivity ?: "--"} · ${profile.displayName}"
                     renderStatusBar()
+                }
+                override fun onTimecode(tc: com.oiw.camera.audio.LtcTimecode) {
+                    lastLtc = tc
+                    runOnUiThread { renderStatusBar() }
                 }
                 override fun onError(message: String, cause: Throwable?) = this@CameraActivity.onError(message, cause)
             },
@@ -313,8 +338,9 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
     private fun renderStatusBar() {
         val clipNote = if (lastClipped > 0) " CLIP!" else ""
         val audio = if (lastAudioDb.isFinite()) "%.0fdB".format(lastAudioDb) else "--"
+        val tc = lastLtc?.let { "  TC $it" } ?: ""
         findViewById<android.widget.TextView>(R.id.status_bar).text =
-            "$statusBase  |  drops:$lastDrops  audio:$audio$clipNote"
+            "$statusBase  |  drops:$lastDrops  audio:$audio$clipNote$tc"
     }
 
     private fun updateStatusFile() {

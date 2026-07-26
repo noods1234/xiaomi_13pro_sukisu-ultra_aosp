@@ -1,0 +1,16 @@
+# Components deliberately not wired into the app yet, with the SPECIFIC missing piece.
+# Format:  ClassName: reason — what must exist before it can be wired
+#
+# Rules for this file:
+#  1. A reason must name the concrete blocker, not "future work".
+#  2. Anything listed here MUST be documented as "library — not wired", never "Implemented".
+#  3. Adding a line here is a deliberate admission, not a way to silence the guard. If this list is
+#     growing, that is the signal to stop writing new components and start connecting them.
+
+CubeLutParser: needs the GL preview pipeline — applying a 3D LUT to the displayed frame is a per-pixel shader transform, not a CPU overlay. Parser + trilinear sampling are unit-tested and correct; nothing consumes them until that shader exists.
+
+DngStillCaptor: needs a dedicated RAW_SENSOR ImageReader added to the capture session (currently preview+encoder+analysis). Also gated on confirming RAW_SENSOR is actually reported on aurora hardware — see assumptions.md A-7 / C-3.
+
+ExternalControlServer: needs a Settings toggle UI plus a CommandHandler bound to CaptureSessionCoordinator. Deliberately not auto-started — it opens a local socket, so it must stay off unless a user explicitly enables it (docs/API_PLUGIN_FRAMEWORK.md #4).
+
+LtcEncoder: needs an audio-output path (AudioTrack) to emit LTC for jam-syncing a slave device. Currently exercised only as the deterministic signal source for LtcDecoder's round-trip tests — a legitimate test-only use, but NOT a shipped feature.

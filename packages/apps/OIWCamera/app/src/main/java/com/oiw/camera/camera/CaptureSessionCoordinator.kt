@@ -9,6 +9,7 @@ import android.os.Handler
 import android.view.Surface
 import com.oiw.camera.capture.CaptureProfile
 import com.oiw.camera.overlay.LumaFrame
+import com.oiw.camera.overlay.VectorscopeOverlay
 import com.oiw.camera.record.AudioCapture
 import com.oiw.camera.record.Recorder
 import java.io.File
@@ -28,11 +29,17 @@ class CaptureSessionCoordinator(
     private val listener: Listener,
 ) {
     interface Listener {
-        fun onLumaFrame(luma: LumaFrame.Luma)
+        /**
+         * One analysis frame. [chroma] is null only if chroma extraction failed for this frame
+         * (the luma overlays still work); it is what feeds the vectorscope.
+         */
+        fun onAnalysisFrame(luma: LumaFrame.Luma, chroma: VectorscopeOverlay.Chroma?)
         fun onRecordingStateChanged(recording: Boolean)
         fun onAudioMeters(peakDbfs: Double, rmsDbfs: Double, clippedSamples: Int)
         fun onDroppedFrames(totalDropped: Int)
         fun onCaptureResultSample(exposureNanos: Long?, isoSensitivity: Int?)
+        /** A SMPTE LTC frame recovered from the audio input (Tier 4), when timecode is enabled. */
+        fun onTimecode(tc: com.oiw.camera.audio.LtcTimecode)
         fun onError(message: String, cause: Throwable? = null)
     }
 
@@ -42,8 +49,10 @@ class CaptureSessionCoordinator(
     private var session: CameraCaptureSession? = null
     private var activeProfile: CaptureProfile? = null
     private val metadataWriter = com.oiw.camera.metadata.MetadataWriter()
+    private val sessionIndexWriter = com.oiw.camera.metadata.SessionIndexWriter()
     @Volatile private var droppedTotal = 0
     private var lastResultSampleNanos = 0L
+    private var ltcEnabled = false
     @Volatile var isRecording = false; private set
 
     /**
@@ -67,7 +76,15 @@ class CaptureSessionCoordinator(
         reader.setOnImageAvailableListener({ r ->
             val image = r.acquireLatestImage() ?: return@setOnImageAvailableListener
             try {
-                listener.onLumaFrame(LumaFrame.extract(image))
+                val luma = LumaFrame.extract(image)
+                // Chroma feeds the vectorscope. Guarded: a device delivering an unexpected plane
+                // layout must degrade to luma-only overlays, not kill the analysis thread.
+                val chroma = try {
+                    if (image.planes.size >= 3) LumaFrame.extractChroma(image) else null
+                } catch (e: Exception) {
+                    null
+                }
+                listener.onAnalysisFrame(luma, chroma)
             } finally {
                 image.close()
             }
@@ -77,6 +94,7 @@ class CaptureSessionCoordinator(
         val rec = Recorder(outputDir, clipBaseName, profile, recorderListener)
         rec.audioEnabled = profile.audioSource != "external_recorder_sync_only"
         recorder = rec
+        ltcEnabled = "timecode" in profile.monitoringOverlays
         val encoderSurface = rec.createEncoderInputSurface()
 
         val s = controller.createSession(previewSurface, encoderSurface, reader.surface, executor)
@@ -115,7 +133,18 @@ class CaptureSessionCoordinator(
         if (isRecording) return
         rec.start()
         if (rec.audioEnabled) {
-            audio = AudioCapture(listener = audioListener).also { it.start() }
+            audio = AudioCapture(listener = audioListener).also { cap ->
+                if (ltcEnabled) {
+                    // Feed raw PCM to the LTC decoder so a house timecode signal on the audio
+                    // input is recovered live (docs/AUDIO_TIMECODE.md Tier 4).
+                    val decoder = com.oiw.camera.audio.LtcDecoder(
+                        sampleRate = 48_000,
+                        frameRate = activeProfile?.frameRateFps?.toDouble() ?: 25.0,
+                    ) { tc -> listener.onTimecode(tc) }
+                    cap.pcmSink = { buf, len -> decoder.process(buf, len) }
+                }
+                cap.start()
+            }
         }
         isRecording = true
         listener.onRecordingStateChanged(true)
@@ -153,6 +182,9 @@ class CaptureSessionCoordinator(
             } catch (e: Exception) {
                 listener.onError("Sidecar write failed for ${file.name} — clip is intact, metadata is not.", e)
             }
+            // Refresh the session shot-list CSV (docs/STORAGE_MEDIA.md #7). Best-effort by design:
+            // a missing index must never affect the recording itself.
+            file.parentFile?.parentFile?.let { sessionIndexWriter.write(it) }
         }
         override fun onDroppedFrame(totalDropped: Int) {
             droppedTotal = totalDropped
