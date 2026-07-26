@@ -6,7 +6,7 @@ import com.google.gson.JsonSyntaxException
 import java.io.File
 
 /**
- * Loads capture profiles from bundled assets (configs/capture_profiles/*.json, copied into
+ * Loads capture profiles from bundled assets (JSON under configs/capture_profiles, copied into
  * app/src/main/assets/capture_profiles/ at build time) and from the user plugin directory
  * (/sdcard/OIW_MEDIA/plugins/profiles/, docs/API_PLUGIN_FRAMEWORK.md #1).
  *
