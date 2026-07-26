@@ -239,14 +239,36 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
         val profile = activeProfile ?: return
         if (coord.isRecording) { coord.stopRecording(); return }
         val target = storageManager.projectClipDir("untitled", java.time.LocalDate.now().toString(), "A_CAM", "preflight")
-        // AUDIT FIX C: benchmark on-demand if we don't have one yet, so the default record path works
-        // (previously the benchmark file was never created and recording could never start). Runs a
-        // ~64MB write test off the UI thread; blocks record start until it completes.
-        var benchmark = storageManager.loadLastBenchmark(profile.storageTarget)
-        if (benchmark == null) {
-            showError("Benchmarking ${profile.storageTarget} storage… (first use)")
-            benchmark = storageManager.runAndStoreBenchmark(target, profile.storageTarget)
+        val cached = storageManager.loadLastBenchmark(profile.storageTarget)
+        if (cached != null) {
+            startRecordingIfPreflightOk(coord, profile, target, cached)
+            return
         }
+        // AUDIT FIX C+I: no benchmark yet — measure on Dispatchers.IO (never the UI thread; a 64 MB
+        // write stalls ~1 s), then preflight and roll. Record button disabled while measuring so a
+        // double-tap can't launch two benchmarks.
+        val recordButton = findViewById<android.widget.Button>(R.id.record_button)
+        recordButton.isEnabled = false
+        showError("Benchmarking ${profile.storageTarget} storage (first use)…")
+        lifecycleScope.launch {
+            val measured = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                storageManager.runAndStoreBenchmark(target, profile.storageTarget)
+            }
+            recordButton.isEnabled = true
+            if (measured == null) {
+                showError("Storage benchmark failed for ${target.absolutePath}. Check free space/permissions.")
+                return@launch
+            }
+            startRecordingIfPreflightOk(coord, profile, target, measured)
+        }
+    }
+
+    private fun startRecordingIfPreflightOk(
+        coord: com.oiw.camera.camera.CaptureSessionCoordinator,
+        profile: CaptureProfile,
+        target: java.io.File,
+        benchmark: com.oiw.camera.storage.StorageManager.BenchmarkResult,
+    ) {
         val preflight = storageManager.preflight(target, profile.bitrateBps, benchmark)
         if (!preflight.ok) {
             showError(preflight.message)

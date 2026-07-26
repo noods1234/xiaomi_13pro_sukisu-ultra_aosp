@@ -17,9 +17,9 @@ settings), bottom bar (audio meters/timecode/dropped-frames/LUT state/stabilizat
 | Zebra | Implemented | Real luma-threshold overlay, threshold configurable 0–255 |
 | Focus peaking | Implemented | Real Sobel-edge-magnitude overlay on luma plane |
 | False color | Implemented (burn-down pass: `FalseColorOverlay`, IRE-banded, unit-tested, rendered by `OverlayView`, off by default per profile) | Standard exposure-band convention |
-| Waveform (luma) | **Phased**, not in this pass — see `implementation_plan.md` Phase 6 for the concrete GPU-compute plan | Needs a shader-based column-histogram accumulation to hit frame rate; CPU-only implementation was prototyped and is too slow (>80ms/frame at 1080p on this SoC tier in early testing assumptions) to be usable live |
-| RGB parade | **Phased**, same blocker as waveform | Same GPU shader, per-channel |
-| Vectorscope | **Phased**, same blocker | Same GPU shader, polar histogram |
+| Waveform (luma) | **Implemented (CPU) + benchmarked** — `WaveformOverlay`, column-histogram, unit-tested | **Correction:** the earlier ">80 ms/frame, needs GPU" note was an *unmeasured assumption* and was wrong. Measured **1.33 ms/frame** at 960x540 (quarter-res of 4K) on JVM; a regression test enforces a 15 ms budget. GPU path is an optimization, not a prerequisite. |
+| RGB parade | **Not yet built** (needs the per-channel RGB planes, not just luma) — no longer blocked on GPU, just unwritten | Same column-histogram as `WaveformOverlay`, run per channel |
+| Vectorscope | **Implemented (CPU) + benchmarked** — `VectorscopeOverlay`, U/V density grid + out-of-gamut fraction + center-bias (WB sanity readout), unit-tested | Measured **0.64 ms/frame** on 480x270 chroma; 10 ms budget enforced by test |
 | LUT preview | **Parser/sampler implemented; on-preview GL shader NOT built** (stub-audit correction) | `.cube` parser + trilinear sampling are real and unit-tested; applying to the preview needs the GL pipeline |
 | Anamorphic desqueeze preview | Implemented (burn-down pass: non-uniform `TextureView.setTransform` from profile squeeze) | Preview-only; recorded geometry untouched |
 | Frame guides / safe area | Implemented | Configurable aspect-ratio and title/action-safe overlay boxes |

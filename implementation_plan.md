@@ -86,11 +86,13 @@ have no code dependency — only a documentation cross-reference.
 - [x] Histogram overlay (real luma histogram from preview `ImageReader` frames).
 - [x] Zebra overlay (real luma-threshold highlight).
 - [x] Focus peaking overlay (real Sobel-edge highlight).
-- [ ] Waveform/RGB parade/vectorscope — **phased**, not implemented in this pass: real-time waveform/vectorscope
-      needs a GPU compute path (RenderScript is deprecated on this API level; the replacement is a custom OpenGL ES
-      compute shader or Vulkan compute pipeline) to hit frame rate on preview-resolution frames. Implementation plan
-      is written in `docs/CINEMA_FEATURES.md` §Monitoring Tools; this is not "future work" hand-waving — it is gated
-      on writing and profiling a GPU shader, which is a distinct, schedulable unit of work.
+- [x] **Waveform + vectorscope implemented on CPU and benchmarked** (`WaveformOverlay`, `VectorscopeOverlay`).
+      The earlier "needs a GPU compute path" claim was an unmeasured assumption and was **wrong by ~50x**:
+      measured 1.33 ms/frame (waveform, 960x540) and 0.64 ms/frame (vectorscope, 480x270 chroma) against a
+      41 ms budget at 24p. Regression tests enforce 15 ms / 10 ms budgets so the claim stays measured.
+- [ ] RGB parade — not built; needs per-channel planes. No longer GPU-blocked, just unwritten.
+- [ ] GL preview pipeline — still genuinely needed for **LUT-on-preview** (a per-pixel 3D-LUT transform of the
+      displayed image is a different problem from computing a histogram, and belongs in a shader).
 - [x] LUT parsing + trilinear sampling (`CubeLutParser`, unit-tested). **On-preview application is NOT built**
       — needs the GL shader path (same GPU work item as waveform below). Previously over-marked as done.
 - [x] Anamorphic desqueeze preview — implemented in the burn-down pass (`CameraActivity.applyDesqueeze`,

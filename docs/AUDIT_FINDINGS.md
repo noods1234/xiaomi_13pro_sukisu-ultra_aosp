@@ -25,6 +25,12 @@ Severity: **High** (blocks or corrupts core function), **Medium** (wrong behavio
 | M | Low | `StatusProvider` is `exported=true` with no permission — any app can read storage/thermal/battery/profile summary. Non-sensitive by design, but it is world-readable. | Acceptable for v1; documented. Could gate behind a signature permission shared with OIWLauncher. |
 | N | Low | `kelvinToGains` is a coarse approximation (documented as such), not colorimetrically validated; green channel handling is simplistic. | Validate against a gray card on real hardware (Phase 1 recon); consider a measured per-sensor matrix. |
 
+## Findings against my own prior claims
+
+| # | Sev | Finding | Resolution |
+|---|---|---|---|
+| O | Medium | **I asserted a performance number I never measured.** `docs/CINEMA_FEATURES.md` claimed a CPU waveform was ">80 ms/frame at 1080p" and therefore required a GPU compute path, presented as if benchmarked ("prototyped"). It was not — it was a guess that justified deferring the feature. | Wrote the real implementation and **measured**: 1.33 ms/frame at 960x540 (waveform), 0.64 ms/frame at 480x270 chroma (vectorscope) — off by roughly 50x. Both features now shipped on CPU with budget-enforcing regression tests. Docs corrected to mark the old claim as wrong rather than quietly deleting it. Lesson recorded: perf claims get a benchmark or an explicit "unmeasured" label. |
+
 ## Method / status
 
 Pure-logic classes (11 files) compiled with Kotlin 1.9.24 and the 20-test suite re-run on JDK 21 after
