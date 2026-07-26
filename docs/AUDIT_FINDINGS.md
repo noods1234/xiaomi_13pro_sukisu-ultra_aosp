@@ -35,9 +35,28 @@ Severity: **High** (blocks or corrupts core function), **Medium** (wrong behavio
 | Q | High | **Shipped a component that could not possibly work.** `VectorscopeOverlay` consumes U/V chroma, but nothing in the codebase extracted chroma — `LumaFrame` read `planes[0]` only. It was marked "Implemented (CPU) + benchmarked" in the same commit. A unit test on synthetic input passed happily, which is exactly why unit tests did not catch it. | Added `LumaFrame.extractChroma` + `ChromaExtraction.readPlane` with correct `pixelStride` handling (chroma is interleaved on most devices — reading contiguously would have produced a plausible but wrong scope). 6 tests incl. an end-to-end neutral-gray feed. |
 | R | Medium | **64% of production classes had never been compiled by any compiler** (23/36), including the whole capture path and all six audit fixes from the previous round. "Reviewed" was doing work that only a compiler can do. | `tools/verify_compile.sh` type-checks everything against real Android API 34 (`android-all` from Maven Central). It immediately found a genuine build-breaker (nested-comment bug in `ProfileRepository`). Evidence tiers are labelled so tier-3 (androidx stubs) is never mistaken for verification. |
 
+## Round 3 — found by the Robolectric execution tier (2026-07-26)
+
+Adding tier 1.5 (real Android framework code executed on the JVM) was itself the audit: three
+defects fell out, two of them in the first run of code that had type-checked cleanly for weeks.
+
+| # | Sev | Finding | Fix |
+|---|---|---|---|
+| S | **High (process)** | **A failing test suite could not fail the harness.** `tools/verify_compile.sh` ran the tier-1 tests as `java … \| tail -6`. A pipeline's exit status is the *last* command's, and `tail` always succeeds — so every red suite would have been reported green. The harness built to stop unverified claims was itself making one. | Both test tiers now run with output captured and `$?` checked explicitly; the script exits non-zero on failure and prints the log path. Verified by construction (the very next run caught finding T instead of swallowing it). |
+| T | **High** | **Storage preflight demanded 8x the throughput it should, and told the user so with raw format placeholders.** Two bugs in one branch: (1) `requiredMbps = requiredBitrateBps / 1_000_000.0` treats a **bits**/s bitrate as mega**bytes**/s, while both benchmark producers report MB/s — the 180 Mbps 4K profile therefore refused any card slower than **216 MB/s** when it actually needs ~27 MB/s, i.e. it would refuse to record on perfectly adequate media. (2) `"…%.1f…" + "…".format(a, b)` binds `.format` to the *second* literal only, so the refusal reached the user as the literal string `Measured write speed %.1f MB/s is below the %.1f MB/s required` — the exact "never show the user a broken message" rule in docs/UI_UX.md. | Bitrate converted bits→bytes; format call parenthesised. `BenchmarkResult.sustainedWriteMbps` renamed to **`sustainedWriteMBps`** because the ambiguous casing *was* the root cause; the JSON key is written under both names and read under either, so older benchmark files still load. `tools/storage_benchmark.sh` updated to match. Two regression tests pin each half. |
+| U | Low | **`ChromaExtraction`/scope work was verified only on synthetic input** — same shape as finding Q. Not a new defect, but tier 1.5 does not reach it either (no `Image`/`ImageReader` under Robolectric). | Unchanged and still open by design: it needs a device frame. Recorded here so it is not mistaken for covered. |
+
+Worth stating plainly: findings S and T are both cases where **review had already passed over the
+code and seen nothing**. A compiler cannot catch a unit mismatch between two `Double`s, and no
+amount of reading catches a shell pipeline's exit status. Execution caught both within minutes.
+
 ## Method / status
 
-Pure-logic classes (11 files) compiled with Kotlin 1.9.24 and the 20-test suite re-run on JDK 21 after
-these edits — still green (the fixes above are in Android-framework-coupled files that compile at
-`./gradlew assembleDebug`, the documented next gate; the audit changes were reviewed, not device-run).
+`tools/verify_compile.sh` is green as of 2026-07-26: **125 classes compiled** against real Android
+API 34, **101 tests executed** (45 pure-JVM + 56 Robolectric), wiring guard clean. It runs in CI on
+every push and PR touching the apps or the harness (`.github/workflows/oiw-apps.yml`).
+
+Scope discipline for anything recorded here: tiers 1/1.5 mean *executed on a JVM*; tier 1.5 is a
+**simulated** Android runtime, not the device. Camera, codec, audio-capture and UI paths remain
+compile-only and are gated on `./gradlew assembleDebug` plus a real on-device take.
 This document is the standing defect register — new findings append here rather than being silently fixed.

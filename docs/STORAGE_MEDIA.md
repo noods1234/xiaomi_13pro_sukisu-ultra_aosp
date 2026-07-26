@@ -31,7 +31,9 @@ filesystem (exFAT/ext4) and cable" rather than failing silently.
   Storage → "Advanced: ext4 (Linux/rooted-only workflows)".
 - Filesystem is verified before recording (`StatFs` + a `blkid`-equivalent capability check where root is available)
   and a write-speed benchmark clip is required before enabling any profile whose bitrate exceeds the last-measured
-  sustained write speed by more than a safety margin (20%).
+  sustained write speed by more than a safety margin (20%). Units, since getting this wrong once already
+  cost an 8x over-requirement (`docs/AUDIT_FINDINGS.md` finding T): profile bitrate is in **bits/s**, the
+  benchmark reports **mega*bytes*/s** (`sustainedWriteMBps`), so the comparison divides the bitrate by 8.
 
 ## 4. Write-speed testing
 

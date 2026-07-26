@@ -5,7 +5,9 @@
 #
 # Usage: ./storage_benchmark.sh <on-device-path> [--serial <adb-serial>] [--size-mb 256] [--count 4]
 #
-# Output: JSON on stdout with sustainedWriteMbps, consumed by OIWCamera's StorageManager.preflight().
+# Output: JSON on stdout with sustainedWriteMBps (mega BYTES per second), consumed by OIWCamera's
+#         StorageManager.preflight(). The legacy sustainedWriteMbps key is emitted too, with the
+#         same value, so older builds still read the file (see audit finding T).
 
 set -euo pipefail
 
@@ -57,14 +59,16 @@ rm -f /tmp/oiw_bench_$$.log
 
 end_ns=$(date +%s%N)
 elapsed_seconds=$(awk "BEGIN { print ($end_ns - $start_ns) / 1000000000.0 }")
-mbps=$(awk "BEGIN { print ($total_bytes / 1000000.0) / $elapsed_seconds }")
+# mega BYTES per second, not megabits — bytes divided by 1e6.
+megabytes_per_second=$(awk "BEGIN { print ($total_bytes / 1000000.0) / $elapsed_seconds }")
 
 cat <<EOF
 {
   "targetPath": "$TARGET_PATH",
   "sampleSizeBytes": $total_bytes,
   "elapsedSeconds": $elapsed_seconds,
-  "sustainedWriteMbps": $mbps,
+  "sustainedWriteMBps": $megabytes_per_second,
+  "sustainedWriteMbps": $megabytes_per_second,
   "directIoUsed": ${direct_io_used:-false},
   "note": "Sustained sequential write only. Does not measure random I/O or long-duration thermal-throttled write degradation — for that, run this alongside tools/thermal_monitor.sh during an actual long recording test (docs/TEST_PLAN.md Storage Tests)."
 }

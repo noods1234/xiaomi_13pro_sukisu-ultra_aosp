@@ -50,6 +50,19 @@ android {
     buildFeatures {
         viewBinding = true
     }
+
+    sourceSets {
+        // Tier 1.5 lives in its own directory so tools/verify_compile.sh can compile the pure-JVM
+        // tier without Robolectric on the classpath. Gradle runs both together.
+        getByName("test") { java.srcDir("src/test/robolectric/java") }
+    }
+
+    testOptions {
+        // Gives Robolectric the merged manifest/resources/assets. The offline harness has no
+        // resource APK, so app assets are unavailable there; locally they are, which makes
+        // ./gradlew testDebugUnitTest strictly the stronger run. See docs/TEST_PLAN.md §0.
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
@@ -62,6 +75,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.11.0")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.12.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
 }

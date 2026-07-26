@@ -1,0 +1,82 @@
+name: OIW apps — verify
+
+# Why this exists: the offline harness only ran when someone remembered to run it, and the
+# dead-code pattern (docs/AUDIT_FINDINGS.md finding P) recurred three times on exactly that
+# "I'll remember" basis. CI makes the guarantee mechanical.
+#
+# Everything it needs comes from Maven Central, so it runs on a stock GitHub runner with no
+# Android SDK and no Google Maven access.
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'packages/apps/**'
+      - 'tools/verify_compile.sh'
+      - 'tools/check_wiring.py'
+      - 'tools/unwired_allowlist.txt'
+      - 'tools/robolectric_deps.txt'
+      - 'tools/robolectric_shim/**'
+      - 'tools/verify_stubs/**'
+      - '.github/workflows/oiw-apps.yml'
+  pull_request:
+    paths:
+      - 'packages/apps/**'
+      - 'tools/verify_compile.sh'
+      - 'tools/check_wiring.py'
+      - 'tools/unwired_allowlist.txt'
+      - 'tools/robolectric_deps.txt'
+      - 'tools/robolectric_shim/**'
+      - 'tools/verify_stubs/**'
+      - '.github/workflows/oiw-apps.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oiw-apps-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # The two android-all jars are ~290 MB and dominate the run; caching them turns a cold
+      # 5-minute fetch into a warm one. Keyed on the pinned dependency list so a version bump
+      # invalidates the cache rather than silently reusing the old jars.
+      - name: Cache verification toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.oiw_verify/lib
+            ~/.oiw_verify/robolectric-deps
+          key: oiw-verify-${{ runner.os }}-${{ hashFiles('tools/robolectric_deps.txt', 'tools/verify_compile.sh') }}
+
+      - name: Verify (compile tiers 2/3, execute tiers 1/1.5, wiring guard)
+        env:
+          OIW_VERIFY_WORK: ${{ github.workspace }}/../.oiw_verify_work
+        run: |
+          # Keep the downloaded jars in the cached location while the build output stays scratch.
+          mkdir -p ~/.oiw_verify/lib ~/.oiw_verify/robolectric-deps "$OIW_VERIFY_WORK"
+          ln -sfn ~/.oiw_verify/lib "$OIW_VERIFY_WORK/lib"
+          ln -sfn ~/.oiw_verify/robolectric-deps "$OIW_VERIFY_WORK/robolectric-deps"
+          bash tools/verify_compile.sh
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oiw-verify-logs
+          path: |
+            ${{ github.workspace }}/../.oiw_verify_work/tier1.log
+            ${{ github.workspace }}/../.oiw_verify_work/tier15.log
+          if-no-files-found: ignore

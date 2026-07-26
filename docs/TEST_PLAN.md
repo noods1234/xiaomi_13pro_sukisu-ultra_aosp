@@ -5,27 +5,55 @@ Every test below is either **automated** (unit/instrumented test in the app's te
 
 ## 0. Offline verification harness (`tools/verify_compile.sh`)
 
-Runs without the Android SDK (Google Maven is blocked in some environments). Three tiers, ordered
+Runs without the Android SDK (Google Maven is blocked in some environments). Four tiers, ordered
 by strength of evidence — **the tier labels matter, don't conflate them**:
 
 | Tier | What | Strength |
 |---|---|---|
-| 1 | Pure-JVM logic — compiled **and executed** (38 tests) | Strongest |
-| 2 | Compiled against **real** Android API 34 (`org.robolectric:android-all`) — 82 classes | Compiles, never runs |
+| 1 | Pure-JVM logic — compiled **and executed** (45 tests) | Strongest |
+| 1.5 | Real Android framework code **executed** on the JVM under Robolectric 4.12.2 (56 tests) | Runs — but in a *simulated* Android runtime, not on the device |
+| 2 | Compiled against **real** Android API 34 (`org.robolectric:android-all`) — 87 classes | Compiles, never runs |
 | 3 | Compiled against **hand-written androidx/AGP stubs** — 38 classes | Weakest: a wrong stub signature could mask a real error. Report as *plausible*, not *verified*. |
 
 Plus `tools/check_wiring.py`, which fails the build if any `main/` class is referenced only by its
 own tests or by comments — the mechanical guard against the dead-code pattern (finding P).
 
-**What this does NOT prove:** runtime behavior. `./gradlew assembleDebug` on a machine with the
+CI runs the whole thing on every push and PR touching `packages/apps/` or the harness
+(`.github/workflows/oiw-apps.yml`), on a stock runner with no Android SDK.
+
+### Tier 1.5 — what it does and does not buy
+
+It executes the filesystem, `Context`, `StatFs`, and `ContentProvider` behavior that tiers 2/3 can
+only type-check. That is where the last four High-severity defects lived, so it earns its keep: it
+found finding T (the 8x storage-throughput unit error plus a user-visible unsubstituted format
+string) on its first run.
+
+Two limitations, stated rather than glossed:
+
+1. **It is not the device.** Robolectric's shadows approximate the framework. A tier-1.5 pass means
+   "the logic behaves correctly against a simulated Android," never "this works on the phone."
+2. **App assets/resources are unavailable in the offline harness.** Robolectric 4.12 runs in BINARY
+   resources mode and wants an aapt2-built resource APK, which needs the Android SDK. So
+   `context.assets` is empty here and the *bundled-asset* branches of `ProfileRepository` /
+   `ButtonMappingLoader` are not exercised by tier 1.5. They are covered instead by
+   `BundledProfileAssetsTest` (tier 1), which parses every shipped profile and mapping straight off
+   disk with the same Gson types — and by `./gradlew testDebugUnitTest`, where AGP supplies real
+   assets and this same test class runs strictly stronger.
+
+Robolectric needs `androidx.test:monitor`, which lives only on Google's Maven (blocked here with a
+403). `tools/robolectric_shim/` supplies the 28-class API surface Robolectric actually calls; see
+that directory's README for why a wrong shim fails loudly instead of mis-verifying app code, and why
+Gradle's result is authoritative when the two disagree.
+
+**What none of this proves:** device behavior. `./gradlew assembleDebug` on a machine with the
 Android SDK, then a real on-device take, remain the true acceptance gates.
 
 ## 1. Unit tests
 
-All tier-1 tests below are compiled with Kotlin 1.9.24 and **executed** on JDK 21 by
-`tools/verify_compile.sh` (§0). **Current result: 38 tests pass.** The Android-framework-heavy
-classes are compiled but not executed (tier 2/3) — they are gated on `./gradlew assembleDebug`
-and a real device.
+All tier-1 and tier-1.5 tests below are compiled with Kotlin 1.9.24 and **executed** on JDK 21 by
+`tools/verify_compile.sh` (§0). **Current result: 45 tier-1 + 56 tier-1.5 = 101 tests pass.** The
+remaining Android-framework-heavy classes (camera, codec, audio, UI) are compiled but not executed
+— they are gated on `./gradlew assembleDebug` and a real device.
 
 | Test | Status |
 |---|---|
@@ -43,8 +71,27 @@ and a real device.
 | `VectorscopeOverlay` (centre/quadrant bias, gamut flag + 10 ms perf budget) | **Compiled + passing** |
 | `ChromaExtraction` (packed, row-padded, **interleaved pixelStride=2**, truncated buffer, e2e feed) | **Compiled + passing** |
 
+| Every shipped capture profile + button mapping parses, has usable fields, and yields a legal exposure (`BundledProfileAssetsTest`) | **Compiled + passing (new)** — reads the real `assets/` JSON off disk |
 | Kelvin→RGB gain math (`CameraController`) | Written; not in the pure harness (file is Android-heavy) — verify at `gradlew test` |
-| Metadata sidecar atomic-write (`MetadataWriter`) | Compiles in the pure set; I/O behavior verify on device |
+
+### Tier 1.5 — Robolectric (executed against a simulated Android runtime)
+
+These eight classes had **never been executed by anything** before this pass; they were type-checked
+only, which is exactly the gap findings C, R and T lived in.
+
+| Test | Status |
+|---|---|
+| `OiwPaths` — media root is `/sdcard/OIW_MEDIA`, never under `/Android/data`; all derived paths stay inside it | **Executed + passing (new)** |
+| `StorageManager` — benchmark write→read round trip through the file the app actually reads (finding C loop) | **Executed + passing (new)** |
+| `StorageManager` — preflight refuse/accept either side of the 1.2x margin, free-space and runtime math | **Executed + passing (new)** |
+| `StorageManager` — required throughput derived from **bits**, not bytes (finding T regression guard) | **Executed + passing (new)** |
+| `StorageManager` — refusal message carries no unsubstituted `%.1f` placeholders (finding T regression guard) | **Executed + passing (new)** |
+| `StorageManager` — clip-folder layout + sanitisation, recovery scan finds orphans and skips finalised clips | **Executed + passing (new)** |
+| `MetadataWriter` — atomic tmp→rename leaves a complete sidecar and no `.tmp`; corrupt/stale files read as null | **Executed + passing (new)** |
+| `SessionIndexWriter` — real session tree → `session_index.csv`, ordering, RFC-4180 escaping, template defaults | **Executed + passing (new)** |
+| `StatusFileWriter` + `StatusProvider` — the OIWCamera→OIWLauncher handshake end to end, incl. the four JSON field names | **Executed + passing (new)** |
+| `ProfileRepository` — user-plugin loading, one malformed file skipped and reported, id override, error clearing | **Executed + passing (new)** |
+| `ButtonMappingLoader` — user override, unmapped input stays unmapped, malformed file returns null | **Executed + passing (new)** |
 
 ### Bug found and fixed during this audit
 Careful review of `Recorder` (not compilable in the harness) found a real defect: segment rollover

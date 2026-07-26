@@ -58,8 +58,11 @@ brief §13). Left/right rails collapse to icon-only in "Distraction-free" mode, 
 Rule: **every error message states the specific cause and, where possible, the corrective action** — never a bare
 "something went wrong." Examples implemented in `OIWCamera`'s error-presentation layer:
 
-- "External SSD write speed 72 MB/s is below the 115 MB/s required by this profile. Lower bitrate or use a faster
-  drive."
+- "Measured write speed 18.4 MB/s is below the 27.0 MB/s required (with safety margin) by this profile. Lower
+  bitrate or use faster storage."
+  (27.0 MB/s = the 180 Mbps 4K profile's 22.5 MB/s plus the 20% margin. The earlier example here quoted
+  "115 MB/s required", which was arithmetic from the 8x unit bug in `StorageManager.preflight` — see
+  `docs/AUDIT_FINDINGS.md` finding T. Corrected rather than quietly deleted.)
 - "Camera HAL rejected fixed frame duration (requested 1/48s, min supported 1/30s at this resolution). Falling back
   to 1/30s."
 - "Thermal headroom low (status: SEVERE). Estimated safe recording time: under 8 minutes at current settings."

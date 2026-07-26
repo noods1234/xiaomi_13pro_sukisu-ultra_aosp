@@ -18,7 +18,13 @@ class StorageManager(private val context: Context) {
         val estimatedRecordSeconds: Long,
     )
 
-    data class BenchmarkResult(val sustainedWriteMbps: Double, val sampleSizeBytes: Long)
+    /**
+     * @param sustainedWriteMBps mega**BYTES** per second — both producers (this class's
+     *   [runAndStoreBenchmark] and tools/storage_benchmark.sh) compute `bytes / 1e6 / seconds`.
+     *   The old name `sustainedWriteMbps` read as megaBITS and is what caused audit finding T, so
+     *   the capitalisation here is load-bearing, not cosmetic.
+     */
+    data class BenchmarkResult(val sustainedWriteMBps: Double, val sampleSizeBytes: Long)
 
     /** Never trust a spec sheet — always compare against a real, recent benchmark (docs/RED_TEAM_AUDIT.md #7). */
     fun preflight(targetDir: File, requiredBitrateBps: Long, lastBenchmark: BenchmarkResult?): PreflightResult {
@@ -27,7 +33,10 @@ class StorageManager(private val context: Context) {
         }
         val statFs = StatFs(targetDir.absolutePath)
         val freeBytes = statFs.availableBytes
-        val requiredMbps = requiredBitrateBps / 1_000_000.0
+        // AUDIT FIX T: bitrate is in BITS/s, the benchmark is in mega BYTES/s. Dividing only by 1e6
+        // compared Mbit/s against MB/s and demanded 8x the real throughput, so the 180 Mbps 4K
+        // profile refused any card slower than 216 MB/s instead of the 27 MB/s it actually needs.
+        val requiredMBps = requiredBitrateBps / 8.0 / 1_000_000.0
         if (lastBenchmark == null) {
             // Pure comparison stays pure: with no benchmark data we cannot certify the target, so we
             // refuse. The CALLER is responsible for running runAndStoreBenchmark() first so this
@@ -40,14 +49,15 @@ class StorageManager(private val context: Context) {
                 0,
             )
         }
-        val marginedRequirement = requiredMbps * SAFETY_MARGIN
-        if (lastBenchmark.sustainedWriteMbps < marginedRequirement) {
+        val marginedRequirement = requiredMBps * SAFETY_MARGIN
+        if (lastBenchmark.sustainedWriteMBps < marginedRequirement) {
             return PreflightResult(
                 false,
-                "Measured write speed %.1f MB/s is below the %.1f MB/s required (with safety margin) " +
-                    "by this profile. Lower bitrate or use faster storage.".format(
-                        lastBenchmark.sustainedWriteMbps, marginedRequirement,
-                    ),
+                // AUDIT FIX T: the parentheses matter. `"a" + "b".format(x)` applies format to "b"
+                // ONLY, so the placeholders in the first half shipped to the user as literal "%.1f".
+                ("Measured write speed %.1f MB/s is below the %.1f MB/s required (with safety " +
+                    "margin) by this profile. Lower bitrate or use faster storage.")
+                    .format(lastBenchmark.sustainedWriteMBps, marginedRequirement),
                 freeBytes,
                 0,
             )
@@ -75,8 +85,12 @@ class StorageManager(private val context: Context) {
         if (!file.exists()) return null
         return runCatching {
             val obj = com.google.gson.Gson().fromJson(file.readText(), com.google.gson.JsonObject::class.java)
+            // Accepts the legacy `sustainedWriteMbps` key so a benchmark file written by an older
+            // build (or an older copy of tools/storage_benchmark.sh) still reads. Same unit either
+            // way — only the name was misleading.
+            val speed = obj.get("sustainedWriteMBps") ?: obj.get("sustainedWriteMbps")
             BenchmarkResult(
-                sustainedWriteMbps = obj.get("sustainedWriteMbps").asDouble,
+                sustainedWriteMBps = speed.asDouble,
                 sampleSizeBytes = obj.get("sampleSizeBytes")?.asLong ?: 0L,
             )
         }.getOrNull()
@@ -105,12 +119,14 @@ class StorageManager(private val context: Context) {
                 fos.fd.sync()
             }
             val elapsedS = (System.nanoTime() - start) / 1_000_000_000.0
-            val mbps = if (elapsedS > 0) (bytes / 1_000_000.0) / elapsedS else 0.0
+            val megabytesPerSecond = if (elapsedS > 0) (bytes / 1_000_000.0) / elapsedS else 0.0
             tmp.delete()
-            val result = BenchmarkResult(sustainedWriteMbps = mbps, sampleSizeBytes = bytes)
+            val result = BenchmarkResult(sustainedWriteMBps = megabytesPerSecond, sampleSizeBytes = bytes)
             val benchDir = com.oiw.camera.util.OiwPaths.benchmarksDir().apply { mkdirs() }
+            // Both keys are written so a file from this build still reads on an older one.
             File(benchDir, "$target.json").writeText(
-                """{"sustainedWriteMbps":$mbps,"sampleSizeBytes":$bytes}"""
+                """{"sustainedWriteMBps":$megabytesPerSecond,""" +
+                    """"sustainedWriteMbps":$megabytesPerSecond,"sampleSizeBytes":$bytes}"""
             )
             result
         } catch (e: Exception) {
