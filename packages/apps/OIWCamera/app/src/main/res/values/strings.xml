@@ -5,4 +5,23 @@
     <string name="record_button">REC</string>
     <string name="still_button">STILL</string>
     <string name="profile_button">PROFILE</string>
+    <string name="slate_button">SLATE</string>
+
+    <string name="slate_title">Slate</string>
+    <string name="slate_project_hint">Project</string>
+    <string name="slate_scene_hint">Scene</string>
+    <string name="slate_shot_hint">Shot</string>
+    <string name="slate_take_hint">Take</string>
+    <string name="slate_circled_label">Circled take (the keeper)</string>
+    <string name="slate_lens_section">Lens and filters — adapted glass reports none of this electronically</string>
+    <string name="slate_lens_hint">Lens (e.g. Helios 44-2 58mm)</string>
+    <string name="slate_focal_hint">Focal length (mm)</string>
+    <string name="slate_aperture_hint">Aperture (e.g. T2.1)</string>
+    <string name="slate_adapter_hint">Adapter / speed booster</string>
+    <string name="slate_filters_hint">Filters, comma separated</string>
+    <string name="slate_nd_hint">ND value (e.g. ND0.9)</string>
+    <string name="slate_notes_hint">Notes</string>
+    <string name="slate_next_take">NEXT TAKE</string>
+    <string name="slate_next_shot">NEXT SHOT</string>
+    <string name="slate_save">SAVE</string>
 </resources>

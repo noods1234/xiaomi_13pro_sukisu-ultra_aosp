@@ -265,6 +265,12 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
             }
         }
         findViewById<android.widget.Button>(R.id.profile_button).setOnClickListener { cycleProfile() }
+        findViewById<android.widget.Button>(R.id.slate_button).setOnClickListener {
+            // Opening the slate mid-take is fine and sometimes necessary (a circled take called
+            // after action). The recording is not touched — the slate only writes a JSON file, and
+            // each segment's sidecar reads it fresh when that segment finalizes.
+            startActivity(android.content.Intent(this, SlateActivity::class.java))
+        }
     }
 
     /** Preflight gate before rolling (stub-audit fix: docs promised it, now enforced). */

@@ -10,10 +10,10 @@ by strength of evidence — **the tier labels matter, don't conflate them**:
 
 | Tier | What | Strength |
 |---|---|---|
-| 1 | Pure-JVM logic — compiled **and executed** (61 tests) | Strongest |
-| 1.5 | Real Android framework code **executed** on the JVM under Robolectric 4.12.2 (63 tests) | Runs — but in a *simulated* Android runtime, not on the device |
-| 2 | Compiled against **real** Android API 34 (`org.robolectric:android-all`) — 91 classes | Compiles, never runs |
-| 3 | Compiled against **hand-written androidx/AGP stubs** — 38 classes | Weakest: a wrong stub signature could mask a real error. Report as *plausible*, not *verified*. |
+| 1 | Pure-JVM logic — compiled **and executed** (69 tests) | Strongest |
+| 1.5 | Real Android framework code **executed** on the JVM under Robolectric 4.12.2 (72 tests) | Runs — but in a *simulated* Android runtime, not on the device |
+| 2 | Compiled against **real** Android API 34 (`org.robolectric:android-all`) — 93 classes | Compiles, never runs |
+| 3 | Compiled against **hand-written androidx/AGP stubs** — 39 classes | Weakest: a wrong stub signature could mask a real error. Report as *plausible*, not *verified*. |
 
 Plus `tools/check_wiring.py`, which fails the build if any `main/` class is referenced only by its
 own tests or by comments — the mechanical guard against the dead-code pattern (finding P).
@@ -51,7 +51,7 @@ Android SDK, then a real on-device take, remain the true acceptance gates.
 ## 1. Unit tests
 
 All tier-1 and tier-1.5 tests below are compiled with Kotlin 1.9.24 and **executed** on JDK 21 by
-`tools/verify_compile.sh` (§0). **Current result: 61 tier-1 + 63 tier-1.5 = 124 tests pass.** The
+`tools/verify_compile.sh` (§0). **Current result: 69 tier-1 + 72 tier-1.5 = 141 tests pass.** The
 remaining Android-framework-heavy classes (camera, codec, audio, UI) are compiled but not executed
 — they are gated on `./gradlew assembleDebug` and a real device.
 
@@ -71,6 +71,7 @@ remaining Android-framework-heavy classes (camera, codec, audio, UI) are compile
 | `VectorscopeOverlay` (centre/quadrant bias, gamut flag + 10 ms perf budget) | **Compiled + passing** |
 | `RgbParadeOverlay` + `YuvToRgb` (exact neutrality at U=V=128, per-axis channel response, clamping, column mapping, short-buffer safety + 20 ms perf budget; measured 1.15 ms) | **Compiled + passing (new)** |
 | `ProfileOverlayVocabularyTest` (no unknown overlay id in any shipped profile; no implemented overlay unreachable from every profile) | **Compiled + passing (new)** |
+| `Slate.applyTo` merge (slate wins where filled; **a blank field never erases a profile default**; take is authoritative; next-take/next-shot semantics; slate display line) | **Compiled + passing (new)** |
 | `ChromaExtraction` (packed, row-padded, **interleaved pixelStride=2**, truncated buffer, e2e feed) | **Compiled + passing** |
 | Every shipped capture profile + button mapping parses, has usable fields, and yields a legal exposure (`BundledProfileAssetsTest`) | **Compiled + passing (new)** — reads the real `assets/` JSON off disk |
 | Kelvin→RGB gain math (`CameraController`) | Written; not in the pure harness (file is Android-heavy) — verify at `gradlew test` |
@@ -95,6 +96,8 @@ only, which is exactly the gap findings C, R, T and W lived in.
 | `ButtonMappingLoader` — user override, unmapped input stays unmapped, malformed file returns null | **Executed + passing (new)** |
 | `OverlayView` — flags default off, follow the profile exactly, and clear on a switch to a leaner profile | **Executed + passing (new)** |
 | `OverlayView` — every scope renders to a real `Canvas` without indexing past its buffers, before any frame arrives, and in a degenerate 8x8 viewport | **Executed + passing (new)** |
+| `SlateStore` — a saved slate survives a process restart; take advance persists; corrupt file falls back; unwritable path reports failure instead of throwing | **Executed + passing (new)** |
+| `SlateStore` → `MetadataWriter` end to end — a slate on disk reaches the clip sidecar | **Executed + passing (new)** |
 
 ### Bug found and fixed during this audit
 Careful review of `Recorder` (not compilable in the harness) found a real defect: segment rollover

@@ -18,6 +18,8 @@ class MetadataWriter {
         val scene: String?,
         val shot: String?,
         val take: Int?,
+        /** Script supervisor's circled take — the keeper. Set from the [Slate]. */
+        val circledTake: Boolean = false,
         val dateTimeIso8601: String,
         val deviceModel: String,
         val romBuild: String,

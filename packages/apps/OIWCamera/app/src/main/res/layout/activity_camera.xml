@@ -62,6 +62,12 @@
             android:text="@string/still_button" />
 
         <Button
+            android:id="@+id/slate_button"
+            android:layout_width="wrap_content"
+            android:layout_height="64dp"
+            android:text="@string/slate_button" />
+
+        <Button
             android:id="@+id/profile_button"
             android:layout_width="wrap_content"
             android:layout_height="64dp"

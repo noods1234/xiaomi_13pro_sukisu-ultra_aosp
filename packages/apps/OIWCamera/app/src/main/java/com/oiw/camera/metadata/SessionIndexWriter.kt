@@ -43,6 +43,7 @@ class SessionIndexWriter(private val exporter: CsvExporter = CsvExporter()) {
           {"sourceField":"scene","columnName":"Scene","default":""},
           {"sourceField":"shot","columnName":"Shot","default":""},
           {"sourceField":"take","columnName":"Take","default":""},
+          {"sourceField":"circledTake","columnName":"Circled","default":"false"},
           {"sourceField":"resolution","columnName":"Resolution"},
           {"sourceField":"frameRateFps","columnName":"FPS"},
           {"sourceField":"codec","columnName":"Codec"},

@@ -63,10 +63,17 @@ compiler, not against the user.** A guard that asks "is this class referenced?" 
 that no shipped configuration turns on. The new check asks the question that actually matters — can
 someone reach this? — and it is the config, not the code, that has to answer.
 
+## Round 5 — found while building the slate UI (2026-07-26)
+
+| # | Sev | Finding | Fix |
+|---|---|---|---|
+| Y | Medium (process) | **The harness's tier split was a hardcoded filename list.** `verify_compile.sh` sent everything except two named files to tier 2 (android-all, no androidx). The first new androidx-using Activity therefore landed in tier 2, failed to compile against a classpath that has no `AppCompatActivity`, and took the entire run down — a harness failure masquerading as a code failure, on correct code. | The split is now derived from the source: any file importing `androidx.*` or referencing the AGP-generated `R` goes to tier 3, and tier 3 is the exact complement. Adding an Activity no longer requires remembering to edit the harness. Tier 3 also now fails if it ends up with no sources, so a filter mistake cannot silently skip a whole tier. |
+| Z | Low | **A CSV assertion was pinned to column indices.** `SessionIndexWriterRobolectricTest` checked `columns[16]` and `columns[18]`; adding the `Circled` column shifted every field after `Take`, so a correct change broke unrelated assertions. That trains you to bump the numbers instead of reading the test. | Columns are resolved by header name, and the header is asserted as a set of required names rather than a prefix string. |
+
 ## Method / status
 
-`tools/verify_compile.sh` is green as of 2026-07-26: **129 classes compiled** against real Android
-API 34, **124 tests executed** (61 pure-JVM + 63 Robolectric), wiring guard clean. It runs in CI on
+`tools/verify_compile.sh` is green as of 2026-07-26: **132 classes compiled** against real Android
+API 34, **141 tests executed** (69 pure-JVM + 72 Robolectric), wiring guard clean. It runs in CI on
 every push and PR touching the apps or the harness (`.github/workflows/oiw-apps.yml`).
 
 Scope discipline for anything recorded here: tiers 1/1.5 mean *executed on a JVM*; tier 1.5 is a

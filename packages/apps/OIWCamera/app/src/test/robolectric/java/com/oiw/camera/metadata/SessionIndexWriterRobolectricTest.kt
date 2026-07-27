@@ -49,7 +49,11 @@ class SessionIndexWriterRobolectricTest {
 
         val lines = csv.readText().split("\r\n").filter { it.isNotEmpty() }
         assertEquals("header + 3 clips", 4, lines.size)
-        assertTrue(lines[0].startsWith("DateTime,Project,Scene,Shot,Take,Resolution,FPS,Codec"))
+        // Asserted as a set, not a prefix string: a new column used to break this the moment one
+        // was added, which trains people to update the expectation rather than read it.
+        val header = lines[0].split(",")
+        listOf("DateTime", "Project", "Scene", "Shot", "Take", "Resolution", "FPS", "Codec")
+            .forEach { assertTrue("shot list must carry a '$it' column, got $header", it in header) }
     }
 
     @Test
@@ -72,10 +76,19 @@ class SessionIndexWriterRobolectricTest {
                "frameRateFps":24,"codec":"hevc10","bitrateBps":180000000,"colorProfile":"flat_approximation"}"""
         )
 
-        val columns = writer.write(sessionDir)!!.readText().split("\r\n")[1].split(",")
-        assertEquals("Scene defaults to empty", "", columns[2])
-        assertEquals("Drops defaults to 0", "0", columns[16])
-        assertEquals("Recovered defaults to false", "false", columns[18])
+        // Looked up by header rather than by index: a new column (Circled) used to silently shift
+        // every assertion after it, which makes an index-based test a maintenance trap.
+        val lines = writer.write(sessionDir)!!.readText().split("\r\n")
+        assertEquals("Scene defaults to empty", "", column(lines, "Scene"))
+        assertEquals("Drops defaults to 0", "0", column(lines, "Drops"))
+        assertEquals("Recovered defaults to false", "false", column(lines, "Recovered"))
+        assertEquals("Circled defaults to false", "false", column(lines, "Circled"))
+    }
+
+    private fun column(lines: List<String>, header: String): String {
+        val index = lines[0].split(",").indexOf(header)
+        assertTrue("no '$header' column in ${lines[0]}", index >= 0)
+        return lines[1].split(",")[index]
     }
 
     @Test

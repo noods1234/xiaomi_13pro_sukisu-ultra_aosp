@@ -30,7 +30,7 @@ settings), bottom bar (audio meters/timecode/dropped-frames/LUT state/stabilizat
 | Audio meters | Implemented | Peak + RMS from `AudioRecord` buffer, dBFS scale |
 | Clipping indicator | Implemented | Audio: sample-value clipping count; Video: histogram bins at 0/255 |
 | Timecode display | **Implemented + wired** — LTC decoded from the audio input (`LtcDecoder` on `AudioCapture.pcmSink`, enabled by `monitoringOverlays: ["timecode"]`) and shown live in the status bar | Tiers per `docs/AUDIO_TIMECODE.md` |
-| Slate metadata screen | **Sidecar fields exist; no slate UI yet** (stub-audit correction) | Fields in `MetadataWriter.ClipMetadata` are real; the entry screen is unbuilt |
+| Slate metadata screen | **Implemented + wired** — `SlateActivity` (SLATE button in the bottom bar), persisted by `SlateStore` to `/sdcard/OIW_MEDIA/.slate.json`, merged into every clip sidecar by `CaptureSessionCoordinator` | Scene/shot/take + circled take + lens/adapter/filters/ND/notes. **Take auto-advances on recording stop, not per segment**, so a long take that rolls over several segment files keeps one take number. Persisted to disk so a process kill mid-shoot cannot silently reset the count. A blank slate field never erases a profile default. |
 
 ### Which profiles actually enable which overlays
 

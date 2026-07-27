@@ -50,6 +50,13 @@ class CaptureSessionCoordinator(
     private var activeProfile: CaptureProfile? = null
     private val metadataWriter = com.oiw.camera.metadata.MetadataWriter()
     private val sessionIndexWriter = com.oiw.camera.metadata.SessionIndexWriter()
+
+    /**
+     * Slate for the take in progress. Read fresh from disk at each segment so an edit made mid-take
+     * (a circled take called out after the fact, say) still reaches the sidecar. Every segment of one
+     * take shares its number — the take only advances on stop, in [stopRecording].
+     */
+    private val slateStore = com.oiw.camera.metadata.SlateStore()
     @Volatile private var droppedTotal = 0
     private var lastResultSampleNanos = 0L
     private var ltcEnabled = false
@@ -156,6 +163,9 @@ class CaptureSessionCoordinator(
         audio?.stop(); audio = null
         recorder?.stop()
         isRecording = false
+        // Take advances on STOP, not per segment: a long take that rolls over several segment files
+        // is still one take, and all of its sidecars must agree on the number.
+        slateStore.advanceTake()
         listener.onRecordingStateChanged(false)
     }
 
@@ -177,6 +187,7 @@ class CaptureSessionCoordinator(
                 kernelBuild = System.getProperty("os.version") ?: "unknown",
                 deviceModel = android.os.Build.MODEL,
             ).copy(droppedFrames = droppedTotal)
+                .let { slateStore.load().applyTo(it) }
             try {
                 metadataWriter.writeAtomically(file, metadata)
             } catch (e: Exception) {

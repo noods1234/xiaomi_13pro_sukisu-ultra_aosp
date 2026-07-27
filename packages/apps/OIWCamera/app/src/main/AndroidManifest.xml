@@ -42,6 +42,15 @@
             </intent-filter>
         </activity>
 
+        <!-- Slate entry (docs/CINEMA_FEATURES.md #2). Not exported: it writes shoot metadata, so
+             only OIWCamera itself opens it. -->
+        <activity
+            android:name=".ui.SlateActivity"
+            android:exported="false"
+            android:label="@string/slate_title"
+            android:screenOrientation="locked"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
         <service
             android:name=".record.RecordingService"
             android:foregroundServiceType="camera|microphone"

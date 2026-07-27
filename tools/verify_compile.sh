@@ -85,9 +85,18 @@ rm -rf "$WORK/out"; mkdir -p "$WORK/out"/{t2,t3}
 
 echo "==> [2/6] tier 2 — compile against REAL Android API 34 (android-all)"
 mkdir -p "$WORK/t2src"; rm -f "$WORK/t2src"/*.kt
-# Everything except the androidx-dependent classes (handled in tier 3).
-find "$CAM_SRC/main/java" -name '*.kt' \
-  ! -name 'CameraActivity.kt' ! -name 'RecordingService.kt' -exec cp {} "$WORK/t2src/" \;
+# Everything except the androidx-dependent classes, which go to tier 3.
+#
+# The split is derived from the source rather than a hardcoded filename list: the list version
+# silently sent each new androidx-using Activity to tier 2, where it failed to compile against
+# android-all and took the whole run down. Anything importing androidx.* or referencing the
+# AGP-generated R belongs in tier 3 by definition.
+find "$CAM_SRC/main/java" -name '*.kt' | while read -r f; do
+  if grep -qE '^import androidx\.|com\.oiw\.camera\.R$|[^A-Za-z]R\.(layout|id|string|drawable)\.' "$f"; then
+    continue
+  fi
+  cp "$f" "$WORK/t2src/"
+done
 kotlinc -jvm-target 17 -nowarn -cp "$ANDROID_CP" -d "$WORK/out/t2" "$WORK/t2src" 2>&1 | grep -vE '^warning:' || true
 [ -n "$(find "$WORK/out/t2" -name '*.class' -print -quit)" ] || { echo "FAIL: tier 2 produced no classes"; exit 1; }
 echo "    OK  $(find "$WORK/out/t2" -name '*.class' | wc -l) classes"
@@ -95,9 +104,14 @@ echo "    OK  $(find "$WORK/out/t2" -name '*.class' | wc -l) classes"
 echo "==> [3/6] tier 3 — androidx/AGP-stubbed classes (weakest tier)"
 STUBS="$REPO_ROOT/tools/verify_stubs"
 mkdir -p "$WORK/t3src"; rm -f "$WORK/t3src"/*.kt
-cp "$CAM_SRC/main/java/com/oiw/camera/ui/CameraActivity.kt" \
-   "$CAM_SRC/main/java/com/oiw/camera/record/RecordingService.kt" "$WORK/t3src/"
+# The complement of tier 2's filter, derived the same way — every camera-app file tier 2 skipped.
+find "$CAM_SRC/main/java" -name '*.kt' | while read -r f; do
+  if grep -qE '^import androidx\.|com\.oiw\.camera\.R$|[^A-Za-z]R\.(layout|id|string|drawable)\.' "$f"; then
+    cp "$f" "$WORK/t3src/"
+  fi
+done
 find "$LAU_SRC/main/java" -name '*.kt' -exec cp {} "$WORK/t3src/" \;
+[ -n "$(find "$WORK/t3src" -name '*.kt' -print -quit)" ] || { echo "FAIL: tier 3 has no sources"; exit 1; }
 kotlinc -jvm-target 17 -nowarn -cp "$ANDROID_CP:$WORK/out/t2" -d "$WORK/out/t3" \
   "$STUBS" "$WORK/t3src" 2>&1 | grep -vE '^warning:' || true
 [ -n "$(find "$WORK/out/t3" -name '*.class' -print -quit)" ] || { echo "FAIL: tier 3 produced no classes"; exit 1; }

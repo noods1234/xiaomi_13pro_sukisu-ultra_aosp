@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Slate entry (docs/CINEMA_FEATURES.md #2, #9). Scrolling single column: on a phone in a rig, a
+  two-column form means mis-taps. Buttons are 64dp per the cinema-control sizing in docs/UI_UX.md
+  #Touch targets — this gets used in the dark, often with gloves.
+
+  Dark background throughout: the slate is opened between takes, and a white form would wreck the
+  operator's night vision and spill light on set.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/slate_title"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:paddingBottom="12dp" />
+
+        <EditText
+            android:id="@+id/slate_project"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:hint="@string/slate_project_hint"
+            android:importantForAutofill="no"
+            android:inputType="text"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#808080" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/slate_scene"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="56dp"
+                android:hint="@string/slate_scene_hint"
+                android:importantForAutofill="no"
+                android:inputType="textCapCharacters"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#808080" />
+
+            <EditText
+                android:id="@+id/slate_shot"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="56dp"
+                android:hint="@string/slate_shot_hint"
+                android:importantForAutofill="no"
+                android:inputType="textCapCharacters"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#808080" />
+
+            <EditText
+                android:id="@+id/slate_take"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="56dp"
+                android:hint="@string/slate_take_hint"
+                android:importantForAutofill="no"
+                android:inputType="number"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#808080" />
+        </LinearLayout>
+
+        <CheckBox
+            android:id="@+id/slate_circled"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="@string/slate_circled_label"
+            android:textColor="#FFFFFF" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/slate_lens_section"
+            android:textColor="#B0B0B0"
+            android:paddingTop="16dp"
+            android:paddingBottom="4dp" />
+
+        <EditText
+            android:id="@+id/slate_lens"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:hint="@string/slate_lens_hint"
+            android:importantForAutofill="no"
+            android:inputType="text"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#808080" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/slate_focal"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="56dp"
+                android:hint="@string/slate_focal_hint"
+                android:importantForAutofill="no"
+                android:inputType="numberDecimal"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#808080" />
+
+            <EditText
+                android:id="@+id/slate_aperture"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="56dp"
+                android:hint="@string/slate_aperture_hint"
+                android:importantForAutofill="no"
+                android:inputType="text"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#808080" />
+        </LinearLayout>
+
+        <EditText
+            android:id="@+id/slate_adapter"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:hint="@string/slate_adapter_hint"
+            android:importantForAutofill="no"
+            android:inputType="text"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#808080" />
+
+        <EditText
+            android:id="@+id/slate_filters"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:hint="@string/slate_filters_hint"
+            android:importantForAutofill="no"
+            android:inputType="text"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#808080" />
+
+        <EditText
+            android:id="@+id/slate_nd"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:hint="@string/slate_nd_hint"
+            android:importantForAutofill="no"
+            android:inputType="text"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#808080" />
+
+        <EditText
+            android:id="@+id/slate_notes"
+            android:layout_width="match_parent"
+            android:layout_height="88dp"
+            android:gravity="top|start"
+            android:hint="@string/slate_notes_hint"
+            android:importantForAutofill="no"
+            android:inputType="textMultiLine"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#808080" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="16dp">
+
+            <Button
+                android:id="@+id/slate_next_take"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="64dp"
+                android:text="@string/slate_next_take" />
+
+            <Button
+                android:id="@+id/slate_next_shot"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="64dp"
+                android:text="@string/slate_next_shot" />
+
+            <Button
+                android:id="@+id/slate_save"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="64dp"
+                android:text="@string/slate_save" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
