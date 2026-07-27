@@ -18,6 +18,6 @@
   "audioSource": "usb_audio",
   "storageTarget": "external_ssd",
   "thermalProfileId": "external_cooling",
-  "monitoringOverlays": ["histogram", "zebra", "focus_peaking", "lut_preview", "frame_guides"],
+  "monitoringOverlays": ["histogram", "zebra", "focus_peaking", "waveform", "vectorscope", "lut_preview", "frame_guides"],
   "buttonMappingId": "default"
 }

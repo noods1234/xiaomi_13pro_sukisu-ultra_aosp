@@ -18,7 +18,7 @@
   "audioSource": "internal_mic",
   "storageTarget": "internal",
   "thermalProfileId": "balanced_field",
-  "monitoringOverlays": ["histogram", "focus_peaking", "anamorphic_desqueeze", "frame_guides"],
+  "monitoringOverlays": ["histogram", "focus_peaking", "waveform", "anamorphic_desqueeze", "frame_guides"],
   "lensMetadataDefaults": { "anamorphicSqueeze": 2.0 },
   "buttonMappingId": "default"
 }

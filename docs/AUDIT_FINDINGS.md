@@ -50,10 +50,23 @@ Worth stating plainly: findings S and T are both cases where **review had alread
 code and seen nothing**. A compiler cannot catch a unit mismatch between two `Double`s, and no
 amount of reading catches a shell pipeline's exit status. Execution caught both within minutes.
 
+## Round 4 — found while building the RGB parade (2026-07-26)
+
+| # | Sev | Finding | Fix |
+|---|---|---|---|
+| V | Medium | **The parade's colour matrix is an assumption, and is labelled as one.** `YuvToRgb` uses BT.601 full-range, the conventional reading of `YUV_420_888`. Android exposes no way to query the stream's actual encoding, so on a device delivering limited-range or BT.709 chroma the traces will sit off where a hardware scope would put them. | **Not "fixed" — bounded and disclosed.** It affects monitoring only; nothing here touches recorded pixels. The conversion is isolated in one testable object with an exact-neutrality test (U=V=128 must give R=G=B=Y, so a grey frame can never show a false cast). Verification against a colour chart is a Phase-1 hardware task. The docs say "not colorimetrically calibrated" rather than implying otherwise. |
+| W | **High** | **`cinema_stealth_street` drew four overlays it never asked for.** Every `OverlayView` flag (`showHistogram`, `showZebra`, `showPeaking`, `showGuides`) defaulted to `true` and only `false_color`/`waveform`/`vectorscope` were read from the profile. So the one profile whose entire purpose is an unadorned frame — the profile you pick when you must not draw attention — still painted a histogram, zebra, peaking and guides over the preview. | All flags default **off**; a single `OverlayView.applyProfileOverlays` drives every one of them from `MonitoringOverlays.viewFlags`. Pinned by a pure-JVM test on the mapping and a Robolectric test on a real `OverlayView`, including that switching to a leaner profile turns the old overlays **off** (stale state across a profile switch was the other half of this). |
+| X | **High (process)** | **A feature can be fully "wired" and still unreachable.** `WaveformOverlay` and `VectorscopeOverlay` were built, unit-tested, benchmarked, hooked into the analysis path, and documented "Implemented + wired" — and **no shipped capture profile listed them**, so no user could ever switch one on. `tools/check_wiring.py` passed, correctly: the *code* was referenced. This is finding P's pattern one level up — the gap moved from code to config. | `ProfileOverlayVocabularyTest` (tier 1) now fails the build in both directions: any overlay id a profile names must be in `MonitoringOverlays.ALL`, and every id in `ALL` must be enabled by at least one shipped profile. Profiles updated so waveform/vectorscope/parade are actually reachable. A misspelled id now also raises an on-screen error instead of silently doing nothing. |
+
+The lesson from X is worth keeping separate from the fix: **"wired" was being measured against the
+compiler, not against the user.** A guard that asks "is this class referenced?" cannot see a feature
+that no shipped configuration turns on. The new check asks the question that actually matters — can
+someone reach this? — and it is the config, not the code, that has to answer.
+
 ## Method / status
 
-`tools/verify_compile.sh` is green as of 2026-07-26: **125 classes compiled** against real Android
-API 34, **101 tests executed** (45 pure-JVM + 56 Robolectric), wiring guard clean. It runs in CI on
+`tools/verify_compile.sh` is green as of 2026-07-26: **129 classes compiled** against real Android
+API 34, **124 tests executed** (61 pure-JVM + 63 Robolectric), wiring guard clean. It runs in CI on
 every push and PR touching the apps or the harness (`.github/workflows/oiw-apps.yml`).
 
 Scope discipline for anything recorded here: tiers 1/1.5 mean *executed on a JVM*; tier 1.5 is a

@@ -19,18 +19,44 @@ class OverlayView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null,
 ) : View(context, attrs) {
 
-    var showHistogram = true
-    var showZebra = true
-    var showPeaking = true
+    // All flags default OFF and are driven entirely by the active profile's `monitoringOverlays`
+    // (see [applyProfileOverlays]). They used to default to ON, which meant `cinema_stealth_street`
+    // — a profile whose whole purpose is an unadorned frame, and which lists no overlays at all —
+    // still drew histogram, zebra, peaking and guides over the preview. docs/AUDIT_FINDINGS.md
+    // finding W.
+    var showHistogram = false
+    var showZebra = false
+    var showPeaking = false
     var showFalseColor = false // exposure-judgment mode: replaces the image, so opt-in per profile
     var showWaveform = false
     var showVectorscope = false
-    var showGuides = true
+    var showRgbParade = false
+    var showGuides = false
     var guideAspect: Float? = 2.39f
+
+    /**
+     * Single place the profile's overlay list becomes view state. Keeping it here (rather than as
+     * a run of string comparisons in the Activity) is what lets one test assert that the shipped
+     * profiles and the code agree on the vocabulary.
+     */
+    fun applyProfileOverlays(overlays: List<String>) {
+        val flags = MonitoringOverlays.viewFlags(overlays)
+        showHistogram = flags.getValue(MonitoringOverlays.HISTOGRAM)
+        showZebra = flags.getValue(MonitoringOverlays.ZEBRA)
+        showPeaking = flags.getValue(MonitoringOverlays.FOCUS_PEAKING)
+        showFalseColor = flags.getValue(MonitoringOverlays.FALSE_COLOR)
+        showWaveform = flags.getValue(MonitoringOverlays.WAVEFORM)
+        showVectorscope = flags.getValue(MonitoringOverlays.VECTORSCOPE)
+        showRgbParade = flags.getValue(MonitoringOverlays.RGB_PARADE)
+        showGuides = flags.getValue(MonitoringOverlays.FRAME_GUIDES)
+    }
 
     private var waveformCounts: IntArray? = null
     private var waveformDims: Pair<Int, Int> = 0 to 0
     private var waveformPeak = 1
+    private var paradeCounts: IntArray? = null
+    private var paradeDims: Pair<Int, Int> = 0 to 0
+    private var paradePeak = 1
     private var vectorGrid: IntArray? = null
     private var vectorSize = 0
     private var vectorPeak = 1
@@ -62,6 +88,8 @@ class OverlayView @JvmOverloads constructor(
         waveform: Triple<IntArray, Pair<Int, Int>, Int>? = null,
         /** density grid, size, peak — from [VectorscopeOverlay]. */
         vectorscope: Triple<IntArray, Int, Int>? = null,
+        /** counts grid, (columns to levels), peak — from [RgbParadeOverlay]. */
+        rgbParade: Triple<IntArray, Pair<Int, Int>, Int>? = null,
     ) {
         maskWidth = luma.width
         maskHeight = luma.height
@@ -74,6 +102,9 @@ class OverlayView @JvmOverloads constructor(
         }
         vectorscope?.let { (grid, size, peak) ->
             vectorGrid = grid; vectorSize = size; vectorPeak = peak.coerceAtLeast(1)
+        }
+        rgbParade?.let { (grid, dims, peak) ->
+            paradeCounts = grid; paradeDims = dims; paradePeak = peak.coerceAtLeast(1)
         }
         falseColorPixels?.let { px ->
             val bmp = falseColorBitmap?.takeIf { it.width == maskWidth && it.height == maskHeight }
@@ -101,8 +132,61 @@ class OverlayView @JvmOverloads constructor(
         if (showPeaking) peakingBitmap?.let { canvas.drawBitmap(it, null, dst, bitmapPaint) }
         if (showHistogram) drawHistogram(canvas)
         if (showWaveform) drawWaveform(canvas)
+        if (showRgbParade) drawRgbParade(canvas)
         if (showVectorscope) drawVectorscope(canvas)
         if (showGuides) drawGuides(canvas)
+    }
+
+    /**
+     * RGB parade: three column-histograms side by side (R, G, B), same axes as the waveform —
+     * x = image column within that channel's panel, y = level with 0 at the bottom. A colour cast
+     * reads as the three traces sitting at different heights.
+     *
+     * Drawn along the bottom edge, offset right of the waveform so both can be on at once (a
+     * colourist commonly wants exposure and balance simultaneously).
+     */
+    private fun drawRgbParade(canvas: Canvas) {
+        val counts = paradeCounts ?: return
+        val (cols, levels) = paradeDims
+        if (cols <= 0 || levels <= 0) return
+        val panelStride = cols * levels
+        if (counts.size < RgbParadeOverlay.CHANNELS * panelStride) return
+
+        val totalW = width * 0.36f
+        val ph = height * 0.22f
+        // Sits to the right of the waveform panel (0.30 wide at x=16) when both are enabled.
+        val left = if (showWaveform) 16f + width * 0.30f + 12f else 16f
+        val top = height - ph - 16f
+        val gap = 6f
+        val panelW = (totalW - 2 * gap) / RgbParadeOverlay.CHANNELS
+        if (panelW <= 0f) return
+
+        val colW = panelW / cols
+        val lvlH = ph / levels
+        for (channel in 0 until RgbParadeOverlay.CHANNELS) {
+            val panelLeft = left + channel * (panelW + gap)
+            canvas.drawRect(panelLeft, top, panelLeft + panelW, top + ph, histogramBgPaint)
+            val base = channel * panelStride
+            val (cr, cg, cb) = channelTint(channel)
+            for (c in 0 until cols) {
+                for (l in 0 until levels) {
+                    val n = counts[base + c * levels + l]
+                    if (n == 0) continue
+                    // Same sqrt compression as the waveform, so the two read consistently.
+                    val a = (255.0 * Math.sqrt(n.toDouble() / paradePeak)).toInt().coerceIn(24, 255)
+                    scopePaint.color = Color.argb(a, cr, cg, cb)
+                    val x = panelLeft + c * colW
+                    val y = top + ph - (l + 1) * lvlH
+                    canvas.drawRect(x, y, x + colW, y + lvlH, scopePaint)
+                }
+            }
+        }
+    }
+
+    private fun channelTint(channel: Int): Triple<Int, Int, Int> = when (channel) {
+        RgbParadeOverlay.RED -> Triple(255, 90, 90)
+        RgbParadeOverlay.GREEN -> Triple(90, 255, 110)
+        else -> Triple(110, 150, 255)
     }
 
     /**

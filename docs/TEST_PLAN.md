@@ -10,9 +10,9 @@ by strength of evidence — **the tier labels matter, don't conflate them**:
 
 | Tier | What | Strength |
 |---|---|---|
-| 1 | Pure-JVM logic — compiled **and executed** (45 tests) | Strongest |
-| 1.5 | Real Android framework code **executed** on the JVM under Robolectric 4.12.2 (56 tests) | Runs — but in a *simulated* Android runtime, not on the device |
-| 2 | Compiled against **real** Android API 34 (`org.robolectric:android-all`) — 87 classes | Compiles, never runs |
+| 1 | Pure-JVM logic — compiled **and executed** (61 tests) | Strongest |
+| 1.5 | Real Android framework code **executed** on the JVM under Robolectric 4.12.2 (63 tests) | Runs — but in a *simulated* Android runtime, not on the device |
+| 2 | Compiled against **real** Android API 34 (`org.robolectric:android-all`) — 91 classes | Compiles, never runs |
 | 3 | Compiled against **hand-written androidx/AGP stubs** — 38 classes | Weakest: a wrong stub signature could mask a real error. Report as *plausible*, not *verified*. |
 
 Plus `tools/check_wiring.py`, which fails the build if any `main/` class is referenced only by its
@@ -51,7 +51,7 @@ Android SDK, then a real on-device take, remain the true acceptance gates.
 ## 1. Unit tests
 
 All tier-1 and tier-1.5 tests below are compiled with Kotlin 1.9.24 and **executed** on JDK 21 by
-`tools/verify_compile.sh` (§0). **Current result: 45 tier-1 + 56 tier-1.5 = 101 tests pass.** The
+`tools/verify_compile.sh` (§0). **Current result: 61 tier-1 + 63 tier-1.5 = 124 tests pass.** The
 remaining Android-framework-heavy classes (camera, codec, audio, UI) are compiled but not executed
 — they are gated on `./gradlew assembleDebug` and a real device.
 
@@ -69,15 +69,16 @@ remaining Android-framework-heavy classes (camera, codec, audio, UI) are compile
 | `LtcEncoder`→`LtcDecoder` full-PCM round-trip at 48k/25, 44.1k/25, 44.1k/30, 48k/29.97 DF | **Compiled + passing** |
 | `WaveformOverlay` (flat/ramp/total-count + 15 ms perf budget) | **Compiled + passing** |
 | `VectorscopeOverlay` (centre/quadrant bias, gamut flag + 10 ms perf budget) | **Compiled + passing** |
+| `RgbParadeOverlay` + `YuvToRgb` (exact neutrality at U=V=128, per-axis channel response, clamping, column mapping, short-buffer safety + 20 ms perf budget; measured 1.15 ms) | **Compiled + passing (new)** |
+| `ProfileOverlayVocabularyTest` (no unknown overlay id in any shipped profile; no implemented overlay unreachable from every profile) | **Compiled + passing (new)** |
 | `ChromaExtraction` (packed, row-padded, **interleaved pixelStride=2**, truncated buffer, e2e feed) | **Compiled + passing** |
-
 | Every shipped capture profile + button mapping parses, has usable fields, and yields a legal exposure (`BundledProfileAssetsTest`) | **Compiled + passing (new)** — reads the real `assets/` JSON off disk |
 | Kelvin→RGB gain math (`CameraController`) | Written; not in the pure harness (file is Android-heavy) — verify at `gradlew test` |
 
 ### Tier 1.5 — Robolectric (executed against a simulated Android runtime)
 
-These eight classes had **never been executed by anything** before this pass; they were type-checked
-only, which is exactly the gap findings C, R and T lived in.
+These nine classes had **never been executed by anything** before this pass; they were type-checked
+only, which is exactly the gap findings C, R, T and W lived in.
 
 | Test | Status |
 |---|---|
@@ -92,6 +93,8 @@ only, which is exactly the gap findings C, R and T lived in.
 | `StatusFileWriter` + `StatusProvider` — the OIWCamera→OIWLauncher handshake end to end, incl. the four JSON field names | **Executed + passing (new)** |
 | `ProfileRepository` — user-plugin loading, one malformed file skipped and reported, id override, error clearing | **Executed + passing (new)** |
 | `ButtonMappingLoader` — user override, unmapped input stays unmapped, malformed file returns null | **Executed + passing (new)** |
+| `OverlayView` — flags default off, follow the profile exactly, and clear on a switch to a leaner profile | **Executed + passing (new)** |
+| `OverlayView` — every scope renders to a real `Canvas` without indexing past its buffers, before any frame arrives, and in a degenerate 8x8 viewport | **Executed + passing (new)** |
 
 ### Bug found and fixed during this audit
 Careful review of `Recorder` (not compilable in the harness) found a real defect: segment rollover

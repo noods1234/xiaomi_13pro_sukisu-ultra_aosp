@@ -113,6 +113,7 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
     private val falseColor = com.oiw.camera.overlay.FalseColorOverlay()
     private val waveform = com.oiw.camera.overlay.WaveformOverlay()
     private val vectorscope = com.oiw.camera.overlay.VectorscopeOverlay()
+    private val rgbParade = com.oiw.camera.overlay.RgbParadeOverlay()
     /** Last LTC timecode decoded from the audio input, if a house signal is present. */
     @Volatile private var lastLtc: com.oiw.camera.audio.LtcTimecode? = null
     private var overlayView: com.oiw.camera.overlay.OverlayView? = null
@@ -144,6 +145,11 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
 
     private fun wireSessionWhenSurfaceReady(profile: CaptureProfile) {
         val controller = cameraController ?: return
+        // A misspelled overlay id used to do nothing at all — the scope just never appeared and the
+        // user had no way to tell a typo from an unsupported feature. Say so instead.
+        com.oiw.camera.overlay.MonitoringOverlays.unknownIn(profile.monitoringOverlays)
+            .takeIf { it.isNotEmpty() }
+            ?.let { showError("Profile '${profile.id}' names unknown overlays: ${it.joinToString()}") }
         // AUDIT FIX (H): a re-wire (profile cycle) must tear down the previous session's resources,
         // or each switch leaks a HandlerThread and stacks another OverlayView on the container.
         analysisThread?.quitSafely()
@@ -154,9 +160,7 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
         val overlay = com.oiw.camera.overlay.OverlayView(this).also {
             it.guideAspect = profile.lensMetadataDefaults?.anamorphicSqueeze?.let { sq -> (16f / 9f * sq.toFloat()) }
                 ?: 2.39f
-            it.showFalseColor = "false_color" in profile.monitoringOverlays
-            it.showWaveform = "waveform" in profile.monitoringOverlays
-            it.showVectorscope = "vectorscope" in profile.monitoringOverlays
+            it.applyProfileOverlays(profile.monitoringOverlays)
             findViewById<android.widget.FrameLayout>(R.id.overlay_container).addView(it)
         }
         overlayView = overlay
@@ -183,6 +187,10 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
                         val grid = vectorscope.compute(chroma)
                         Triple(grid, vectorscope.outputSize(), grid.max())
                     } else null
+                    val parade = if (overlay.showRgbParade && chroma != null) {
+                        val grid = rgbParade.compute(luma, chroma)
+                        Triple(grid, rgbParade.outputSize(), rgbParade.peak(grid))
+                    } else null
                     overlay.submit(
                         luma,
                         if (overlay.showZebra) zebra.computeMask(luma) else null,
@@ -191,6 +199,7 @@ class CameraActivity : AppCompatActivity(), CameraController.Listener {
                         if (overlay.showFalseColor) falseColor.colorize(luma) else null,
                         wf,
                         vs,
+                        parade,
                     )
                 }
                 override fun onRecordingStateChanged(recording: Boolean) = runOnUiThread {

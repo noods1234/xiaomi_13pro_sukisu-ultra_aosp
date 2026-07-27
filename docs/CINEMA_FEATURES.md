@@ -18,7 +18,7 @@ settings), bottom bar (audio meters/timecode/dropped-frames/LUT state/stabilizat
 | Focus peaking | Implemented | Real Sobel-edge-magnitude overlay on luma plane |
 | False color | Implemented (burn-down pass: `FalseColorOverlay`, IRE-banded, unit-tested, rendered by `OverlayView`, off by default per profile) | Standard exposure-band convention |
 | Waveform (luma) | **Implemented + wired + benchmarked** — `WaveformOverlay` -> `OverlayView`, enabled via a profile's `monitoringOverlays: ["waveform"]` | **Correction:** the earlier ">80 ms/frame, needs GPU" note was an *unmeasured assumption* and was wrong. Measured **1.33 ms/frame** at 960x540 (quarter-res of 4K) on JVM; a regression test enforces a 15 ms budget. GPU path is an optimization, not a prerequisite. |
-| RGB parade | **Not built** — now genuinely cheap: chroma extraction exists, so this is a per-channel reuse of `WaveformOverlay` | Same column-histogram as `WaveformOverlay`, run per channel |
+| RGB parade | **Implemented + wired + benchmarked** — `RgbParadeOverlay` -> `OverlayView`, enabled via `monitoringOverlays: ["rgb_parade"]` (ships on `cinema_tripod_manual` and `cinema_4k_24_log`) | Measured **1.15 ms/frame** at 480x270 chroma; 20 ms budget enforced by test. Computed at chroma resolution — one sample per 4:2:0 site, which is all the colour detail the frame carries. **Colour matrix is BT.601 full-range, an assumption Android does not let us verify at runtime — see `docs/AUDIT_FINDINGS.md` finding V. Not colorimetrically calibrated.** |
 | Vectorscope | **Implemented + wired + benchmarked** — `VectorscopeOverlay` fed by real chroma extraction (`ChromaExtraction`, pixelStride-aware); density grid + out-of-gamut fraction + centre-bias WB readout; enabled via `monitoringOverlays: ["vectorscope"]` | Measured **0.64 ms/frame** on 480x270 chroma; 10 ms budget enforced by test |
 | LUT preview | **library — not wired.** Parser + trilinear sampling unit-tested; needs the GL shader path (`tools/unwired_allowlist.txt`) | `.cube` parser + trilinear sampling are real and unit-tested; applying to the preview needs the GL pipeline |
 | Anamorphic desqueeze preview | Implemented (burn-down pass: non-uniform `TextureView.setTransform` from profile squeeze) | Preview-only; recorded geometry untouched |
@@ -31,6 +31,31 @@ settings), bottom bar (audio meters/timecode/dropped-frames/LUT state/stabilizat
 | Clipping indicator | Implemented | Audio: sample-value clipping count; Video: histogram bins at 0/255 |
 | Timecode display | **Implemented + wired** — LTC decoded from the audio input (`LtcDecoder` on `AudioCapture.pcmSink`, enabled by `monitoringOverlays: ["timecode"]`) and shown live in the status bar | Tiers per `docs/AUDIO_TIMECODE.md` |
 | Slate metadata screen | **Sidecar fields exist; no slate UI yet** (stub-audit correction) | Fields in `MetadataWriter.ClipMetadata` are real; the entry screen is unbuilt |
+
+### Which profiles actually enable which overlays
+
+Worth stating explicitly, because it was wrong: a monitoring tool being *implemented* is not the
+same as it being *reachable*. `waveform` and `vectorscope` spent a while fully built, tested,
+benchmarked and hooked into the analysis path while **no shipped profile listed them**, so no user
+could turn either on (`docs/AUDIT_FINDINGS.md` finding X). And every `OverlayView` flag defaulted
+to on, so `cinema_stealth_street` — a profile whose entire point is a clean frame, listing no
+overlays at all — still drew four (finding W).
+
+Both are now mechanical rather than remembered: `MonitoringOverlays` is the single vocabulary,
+`OverlayView.applyProfileOverlays` is the single mapping (everything defaults **off**), and
+`ProfileOverlayVocabularyTest` fails the build if a profile names an unknown overlay **or** if any
+implemented overlay is unreachable from every shipped profile. An unknown id also surfaces as an
+on-screen error rather than doing nothing.
+
+| Profile | Overlays |
+|---|---|
+| `cinema_tripod_manual` | histogram, zebra, focus peaking, waveform, RGB parade, vectorscope, LUT preview, guides |
+| `cinema_4k_24_log` | histogram, zebra, focus peaking, waveform, RGB parade, LUT preview, guides |
+| `cinema_external_ssd_max` | histogram, zebra, focus peaking, waveform, vectorscope, LUT preview, guides |
+| `cinema_anamorphic_133` / `_2x` | histogram, focus peaking, waveform, desqueeze, guides |
+| `cinema_ir_false_color` | false color, histogram |
+| `cinema_stealth_street` | none — deliberately unadorned |
+| others | histogram (+ zebra / guides as listed in the asset) |
 
 ## 3. Button mappings
 
