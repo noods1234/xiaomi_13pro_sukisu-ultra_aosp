@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OIW-ROM External Control Message (docs/API_PLUGIN_FRAMEWORK.md #4)",
+  "description": "Newline-delimited JSON messages over the local, pairing-token-gated TCP control socket. Disabled by default.",
+  "type": "object",
+  "required": ["cmd"],
+  "properties": {
+    "cmd": {
+      "type": "string",
+      "enum": [
+        "record_start", "record_stop", "profile_switch", "set_exposure", "set_iso",
+        "set_white_balance", "set_focus", "slate_metadata", "status_query"
+      ]
+    },
+    "value": { "type": ["number", "string", "null"] },
+    "token": { "type": "string", "description": "required pairing token on first message of a connection" }
+  }
+}

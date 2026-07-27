@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:name="android.hardware.camera.any" android:required="true" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+    <!-- All-files access for /sdcard/OIW_MEDIA raw-File segmented writing (docs/SECURITY_AND_RECOVERY.md #8
+         documents this measured trade-off; requested via a Settings intent with in-UI explanation). -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" xmlns:tools="http://schemas.android.com/tools" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Local-only external control socket (docs/API_PLUGIN_FRAMEWORK.md #4); not used for any WAN traffic. -->
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.OIWCamera"
+        android:hardwareAccelerated="true">
+
+        <activity
+            android:name=".ui.CameraActivity"
+            android:exported="true"
+            android:screenOrientation="locked"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Allows OIWLauncher (packages/apps/OIWLauncher) to boot straight into capture. -->
+            <intent-filter>
+                <action android:name="com.oiw.launcher.action.LAUNCH_CAMERA" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Slate entry (docs/CINEMA_FEATURES.md #2). Not exported: it writes shoot metadata, so
+             only OIWCamera itself opens it. -->
+        <activity
+            android:name=".ui.SlateActivity"
+            android:exported="false"
+            android:label="@string/slate_title"
+            android:screenOrientation="locked"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <service
+            android:name=".record.RecordingService"
+            android:foregroundServiceType="camera|microphone"
+            android:exported="false" />
+
+        <provider
+            android:name=".metadata.StatusProvider"
+            android:authorities="com.oiw.camera.status"
+            android:exported="true" />
+
+    </application>
+</manifest>

@@ -1,0 +1,97 @@
+# OIW-ROM Architecture
+
+## 1. Purpose
+
+One Inch Wonder (OIW-ROM) converts a rooted Xiaomi 13 Pro (`nuwa`) running stock HyperOS + the SukiSU Ultra GKI
+kernel (this repo) into a purpose-built cinema camera. This document describes the full layered architecture: what
+runs where, why, and which of the five candidate build paths each layer uses.
+
+## 2. Build path selection matrix
+
+| Path | Description | Feasibility here | Risk | Required files | Effort | Feature ceiling | Recovery path | Test plan |
+|---|---|---|---|---|---|---|---|---|
+| **A — Full custom ROM** (LineageOS 23.2 + community trees + OIW layer) | Compile a full LineageOS-based ROM from the verified community `nuwa` trees, with OIW apps/configs baked in. | **UNBLOCKED (2026-07-06) and now the primary track.** Verified chain: official `LineageOS/android_device_xiaomi_nuwa` + `sm8550-common` + `hardware_xiaomi` + Xiaomi-derived kernel trio (incl. source-built camera-kernel techpack) + `TheMuppets` blob captures, all @ `lineage-23.2`. See `manifests/oiw_nuwa.xml` + `tools/build_full_rom.sh`. | Medium-high — full-image flash, recover via Lineage recovery/fastboot + stock firmware reflash. | `manifests/oiw_nuwa.xml`, `vendor/oiw/*`, build host (~400 GB disk) | High (hours-long compile on a real build host; not runnable in this authoring environment) | Highest (framework patches possible, source kernel + kernel camera driver, Lineage Camera2 behavior instead of HyperOS restrictions) | Lineage recovery + fastboot + stock HyperOS fastboot ROM reflash | `docs/TEST_PLAN.md` full matrix |
+| **B — Hybrid vendor ROM modification** | Debloat stock HyperOS via root; ship a custom-tuned kernel + overlays/Magisk modules/custom launcher+camera app on top of stock vendor image. | **Used.** Root (SukiSU Ultra) is present; OIW uses it for thermal-zone reads and systemless overlays, and ships a **verified cinema kernel variant** (`nuwa-oiw`, NTFS3/UDF footage-drive support) wired into CI (`docs/BUILD_SYSTEM.md` §1). | Medium — kernel flash is reversible via stock boot image; module changes via Magisk. | `Kernel/configs/nuwa-oiw.config.json`, `kernel/oiw/nuwa/*`, Magisk/KernelSU modules | Medium | Medium-high (root-gated OS tweaks + kernel storage/FS breadth; no camera HAL rewrite — GKI vendor-module limit) | Uninstall module / re-flash stock boot image | `docs/TEST_PLAN.md` §Boot Tests |
+| **C — GSI-based development** | Treble GSI + stock vendor partition, for early UI/storage/thermal testing. | **Not used.** `nuwa` HyperOS Treble compliance is unconfirmed and GSI camera support on GSIs is historically poor (stock camera HAL usually is not GSI-compatible for anything beyond basic YUV preview). | Medium | GSI image, vendor partition intact | Low-medium | Low (camera HAL usually degrades hard on GSI) | Re-flash stock system image | N/A — excluded |
+| **D — App-first cinema layer** | Robust standalone camera app (`OIWCamera`) + launcher (`OIWLauncher`) on stock firmware, using public Camera2/MediaCodec APIs. | **Primary path used in this repo.** No device/vendor tree needed; works on any properly-rooted or even unrooted `nuwa` unit for the app layer itself (root only needed for thermal-zone reads and future kernel work). | Low — ordinary APK install/uninstall, fully reversible. | `packages/apps/OIWCamera/*`, `packages/apps/OIWLauncher/*` | Medium | Medium (bounded by what Camera2 + vendor exposes; no raw ISP/HAL rewrite) | `adb uninstall`, no system partition touched | `docs/TEST_PLAN.md` full app-layer matrix |
+| **E — Experimental HAL shim** | Wrapper/shim around the existing camera HAL to expose more manual control/metadata without redistributing proprietary internals. | **Documented as a research track only**, not implemented. Requires disassembling/hooking a running proprietary HAL process (e.g., via `LD_PRELOAD`/Frida-style interposition against `android.hardware.camera.provider@2.x`/AIDL service), which is high-risk, easy to destabilize camera service, and blurs into HAL redistribution/tamper concerns we've been asked to avoid. | High — can crash `cameraserver`, hard to debug, brittle across HyperOS updates. | N/A (research spike only) | Very high | Potentially highest short of Path A | Force-stop/restart `cameraserver`, reboot | Manual exploratory testing only |
+
+**Chosen strategy (revised 2026-07-06):** Path A (full LineageOS-based OIW build) is the **primary track** now that
+the complete device/vendor/kernel chain is verified (`assumptions.md` A-3, corrected). Path B (rooted-HyperOS OIW
+cinema kernel) and Path D (app-first layer) remain fully maintained as the low-risk option for users staying on
+stock HyperOS — everything in `packages/apps/` runs identically on both. Path E remains research-only; Path C
+excluded as net-negative for a camera-first product.
+
+**Note on the stack diagram below:** it describes the Path B/D deployment (stock HyperOS). Under Path A, the
+"Android framework" and "Vendor layer" rows become LineageOS-built-from-source + TheMuppets blob vendor image, and
+the kernel (including the camera-kernel techpack driver) builds from the Xiaomi-derived source tree — which raises
+the camera HAL access ceiling (see `docs/CAMERA_PIPELINE.md` §2, Tier 5 note).
+
+## 3. Layer diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ UI / App layer                                                          │
+│  OIWLauncher (HOME) ──launches──> OIWCamera (capture, monitoring, LUTs) │
+└───────────────┬───────────────────────────────┬─────────────────────────┘
+                │ Camera2 / MediaCodec / MediaMuxer│ Storage Access Framework /
+                │ (public Android APIs)            │ MediaStore / raw File (root)
+┌───────────────▼───────────────────────────────▼─────────────────────────┐
+│ Android framework (stock HyperOS, unmodified — Path A blocked)          │
+│  CameraService · MediaCodec/OMX-IL/Codec2 · SurfaceFlinger · AudioFlinger│
+└───────────────┬───────────────────────────────┬─────────────────────────┘
+                │ HIDL/AIDL camera provider        │ V4L2 / ALSA / codec2 HAL
+┌───────────────▼───────────────────────────────▼─────────────────────────┐
+│ Vendor layer (stock, proprietary, unmodified — no vendor tree available)│
+│  Qualcomm camx/chi-cdk camera HAL · ISP firmware · vendor tags          │
+└───────────────┬───────────────────────────────────────────────────────── ┘
+                │
+┌───────────────▼───────────────────────────────────────────────────────── ┐
+│ Kernel layer (THIS REPO'S ACTUAL BUILD SURFACE — the OIW cinema kernel) │
+│  SukiSU Ultra GKI kernel (crdroid SM8550 source) + SUSFS + KPM           │
+│  + verified OIW cinema delta (nuwa-oiw variant): NTFS3/UDF footage-drive │
+│    support + -oiw-cinema localversion. GKI = camera/ISP are vendor       │
+│    modules, NOT changeable here.                                         │
+└───────────────┬───────────────────────────────────────────────────────── ┘
+                │
+┌───────────────▼───────────────────────────────────────────────────────── ┐
+│ Hardware                                                                 │
+│  Snapdragon 8 Gen 2 (SM8550) · Sony IMX989 1"-type sensor · USB-C ·      │
+│  UFS storage · thermal sensors                                          │
+└───────────────────────────────────────────────────────────────────────── ┘
+```
+
+The critical architectural fact: **everything above the kernel line except the app layer is stock, proprietary, and
+unmodifiable without sources we don't have.** OIW-ROM's entire feature ceiling is bounded by what stock HyperOS
+exposes through Camera2, MediaCodec, and root-readable `/sys` and `/proc` nodes.
+
+## 4. Subsystem architecture
+
+### 4.1 Camera pipeline
+See `docs/CAMERA_PIPELINE.md`. Camera2 → `ImageReader` (preview analysis for overlays) + `Surface` (encoder input) →
+`MediaCodec` (hardware AVC/HEVC encode) → `MediaMuxer` (MP4 container) → segmented file writer → JSON sidecar.
+
+### 4.2 Media/storage pipeline
+See `docs/STORAGE_MEDIA.md`. Preflight benchmark → capacity/time estimate → write → atomic sidecar → crash-recovery
+index entry → optional hash verification.
+
+### 4.3 Thermal/power pipeline
+See `docs/THERMAL_POWER.md`. In-app `ThermalMonitor` polls `/sys/class/thermal/thermal_zone*/temp` (root read via
+SukiSU Ultra `su`), maps to one of 7 OIW thermal modes, and drives Android's public thermal-aware knobs (screen
+brightness cap, foreground-only operation, network radios off) plus a "graceful stop" state machine.
+
+### 4.4 UI/app layer
+See `docs/UI_UX.md`. OIWLauncher is the `HOME`/`DEFAULT` launcher; boots directly to a camera-ready state.
+OIWCamera owns the record/monitor/profile experience.
+
+### 4.5 Debug/recovery architecture
+See `docs/SECURITY_AND_RECOVERY.md`. Recovery is bounded to what the base SukiSU Ultra project already provides
+(stock recovery, fastboot, boot image backup/restore) since Path A recovery (custom recovery partition, A/B slot
+management rewrite) is out of scope without a device tree.
+
+## 5. Non-goals (explicit)
+
+- Rewriting `cameraserver`, `camx`, or ISP firmware.
+- Building or signing a full HyperOS system image.
+- Providing a custom recovery (TWRP-equivalent) — none exists for this device in the open-source ecosystem consulted
+  here; stock recovery + fastboot is the supported recovery path.

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OIW-ROM local manifest — PRIMARY TARGET: Xiaomi 14 Ultra (aurora, SM8650 "pineapple").
+
+  Why aurora (retarget decision 2026-07-06): the 13 Pro (nuwa) has a USB 2.0 port with no DP alt
+  mode — a hardware wall for clean external monitoring. The 14 Ultra keeps the project's namesake
+  1-inch-type sensor (Sony LYT-900) AND has USB 3.2 with DisplayPort Alt Mode, giving native wired
+  clean-feed monitoring. nuwa assets remain in-repo as the legacy/secondary target.
+
+  Verification status (2026-07-06):
+    VERIFIED  Neoteric-OS/android_device_xiaomi_aurora    branch `bka` (BoardConfig, aurora.mk,
+              pineapple.mk, proprietary-files.txt, extract-files.sh present; active tree)
+    LISTED    Neoteric-OS/android_device_xiaomi_aurora-kernel (companion prebuilt-kernel repo,
+              found via GitHub search; branch to pin at sync time)
+    LISTED    miyqwx-dev/android_vendor_xiaomi_aurora and DagobertX/android_vendor_xiaomi_aurora
+              (community vendor-blob repos; alternatively run the tree's own extract-files.sh
+              against your device/stock firmware)
+    ALTERNATE xiaomi-8560/device_xiaomi_aurora (+ -kernel), HurtCopain/device_xiaomi_aurora
+  There is no official-LineageOS aurora tree and no TheMuppets aurora blobs (searched, 0 results) —
+  aurora is a maintainer-tree device. PIN EXACT BRANCHES/COMMITS after `repo sync` and record them
+  in bringup notes; maintainer branch names track their parent ROM's release cadence.
+
+  NOTE: aurora trees target their parent ROM's build system (Neoteric = QPR-current AOSP base).
+  Confirm the matching platform manifest/branch from the maintainer's README at sync time — unlike
+  the nuwa/lineage-23.2 manifest, the base branch here is intentionally not hardcoded.
+-->
+<manifest>
+  <project name="Neoteric-OS/android_device_xiaomi_aurora"
+           path="device/xiaomi/aurora" remote="github" revision="bka" />
+  <project name="Neoteric-OS/android_device_xiaomi_aurora-kernel"
+           path="device/xiaomi/aurora-kernel" remote="github" revision="bka" />
+  <project name="Neoteric-OS/android_hardware_xiaomi"
+           path="hardware/xiaomi" remote="github" revision="bka" />
+  <project name="Neoteric-OS/android_device_xiaomi_sepolicy"
+           path="device/xiaomi/sepolicy" remote="github" revision="bka" />
+  <!-- Official Xiaomi kernel SOURCE for aurora also exists (aurora-u-oss, Linux 6.1 GKI) in this
+       project's own mirror — used by the Kernel/configs/aurora-oiw CI variant; the Neoteric
+       -kernel repo above is the prebuilt-kernel path the device tree expects. -->
+  <!-- Vendor blobs: pick ONE of the community repos below, or generate vendor/ locally with
+       device/xiaomi/aurora/extract-files.sh against your own device/firmware. -->
+  <project name="miyqwx-dev/android_vendor_xiaomi_aurora"
+           path="vendor/xiaomi/aurora" remote="github" revision="refs/heads/main" />
+
+  <!-- OIW cinema layer (apps/configs/oiw.mk), same as the nuwa manifest -->
+  <project name="noods1234/xiaomi_13pro_sukisu-ultra_aosp"
+           path="vendor/oiw-rom" remote="github" revision="claude/oiw-cinema-rom-design-zf3zso" />
+</manifest>

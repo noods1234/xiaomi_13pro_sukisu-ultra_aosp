@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OIW-ROM Metadata Exporter Template",
+  "description": "Declarative field-mapping template for exporting clip_metadata.schema.json sidecars to CSV/XML (docs/API_PLUGIN_FRAMEWORK.md #1). Not executable code.",
+  "type": "object",
+  "required": ["id", "format", "fields"],
+  "properties": {
+    "id": { "type": "string" },
+    "format": { "type": "string", "enum": ["csv", "xml"] },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sourceField", "columnName"],
+        "properties": {
+          "sourceField": { "type": "string", "description": "dot-path into clip_metadata.schema.json" },
+          "columnName": { "type": "string" },
+          "default": { "type": "string" }
+        }
+      }
+    }
+  }
+}

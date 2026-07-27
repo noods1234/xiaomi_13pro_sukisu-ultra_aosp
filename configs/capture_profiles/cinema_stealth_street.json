@@ -1,0 +1,23 @@
+{
+  "id": "cinema_stealth_street",
+  "displayName": "Cinema Stealth Street",
+  "resolution": { "width": 1920, "height": 1080 },
+  "frameRateFps": 24,
+  "shutter": { "mode": "angle", "shutterAngleDegrees": 180 },
+  "isoMin": 100,
+  "isoMax": 3200,
+  "whiteBalanceKelvin": 5600,
+  "tint": 0,
+  "focusMode": "continuous_locked_on_start",
+  "codec": "hevc",
+  "bitrateBps": 40000000,
+  "bitDepth": 8,
+  "colorProfile": "standard",
+  "lutId": null,
+  "stabilization": "eis",
+  "audioSource": "internal_mic",
+  "storageTarget": "internal",
+  "thermalProfileId": "stealth_low_heat",
+  "monitoringOverlays": [],
+  "buttonMappingId": "default"
+}

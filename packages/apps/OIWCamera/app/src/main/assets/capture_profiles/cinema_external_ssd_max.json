@@ -1,0 +1,23 @@
+{
+  "id": "cinema_external_ssd_max",
+  "displayName": "Cinema External SSD Max Quality",
+  "resolution": { "width": 3840, "height": 2160 },
+  "frameRateFps": 24,
+  "shutter": { "mode": "angle", "shutterAngleDegrees": 180 },
+  "isoMin": 100,
+  "isoMax": 3200,
+  "whiteBalanceKelvin": 5600,
+  "tint": 0,
+  "focusMode": "manual",
+  "codec": "hevc10",
+  "bitrateBps": 160000000,
+  "bitDepth": 10,
+  "colorProfile": "flat_approximation",
+  "lutId": "rec709_neutral_monitor",
+  "stabilization": "off",
+  "audioSource": "usb_audio",
+  "storageTarget": "external_ssd",
+  "thermalProfileId": "external_cooling",
+  "monitoringOverlays": ["histogram", "zebra", "focus_peaking", "waveform", "vectorscope", "lut_preview", "frame_guides"],
+  "buttonMappingId": "default"
+}

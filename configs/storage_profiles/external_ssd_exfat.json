@@ -1,0 +1,11 @@
+{
+  "id": "external_ssd_exfat",
+  "displayName": "External SSD (exFAT, recommended)",
+  "target": "external_ssd",
+  "recommendedFilesystem": "exFAT",
+  "segmentSizeBytes": 4294967296,
+  "segmentDurationSeconds": 600,
+  "safetyMarginMultiplier": 1.2,
+  "requireBenchmarkBeforeFirstUse": true,
+  "notes": "exFAT chosen for cross-platform (macOS/Windows/Linux) edit-bay compatibility, docs/STORAGE_MEDIA.md #3."
+}

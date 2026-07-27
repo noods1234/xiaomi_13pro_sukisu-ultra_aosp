@@ -1,0 +1,11 @@
+{
+  "id": "balanced_field",
+  "displayName": "Balanced Field",
+  "warningThermalStatus": "LIGHT",
+  "forcedStopThermalStatus": "SEVERE",
+  "displayBrightnessCapPercent": 70,
+  "backgroundServicesForegroundOnly": true,
+  "radiosForcedOff": ["wifi", "bluetooth"],
+  "chargingWarning": true,
+  "loggingLevel": "info"
+}

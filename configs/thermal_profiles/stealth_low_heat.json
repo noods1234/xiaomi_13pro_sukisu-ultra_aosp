@@ -1,0 +1,12 @@
+{
+  "id": "stealth_low_heat",
+  "displayName": "Stealth Low Heat",
+  "warningThermalStatus": "LIGHT",
+  "forcedStopThermalStatus": "MODERATE",
+  "displayBrightnessCapPercent": 20,
+  "uiTheme": "dim",
+  "backgroundServicesForegroundOnly": true,
+  "radiosForcedOff": ["wifi", "bluetooth", "cellular_suggested"],
+  "chargingWarning": true,
+  "loggingLevel": "warn_only"
+}

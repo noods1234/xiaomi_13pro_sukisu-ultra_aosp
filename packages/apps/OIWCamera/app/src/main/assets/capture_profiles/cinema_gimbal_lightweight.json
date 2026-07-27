@@ -1,0 +1,23 @@
+{
+  "id": "cinema_gimbal_lightweight",
+  "displayName": "Cinema Gimbal Lightweight",
+  "resolution": { "width": 3840, "height": 2160 },
+  "frameRateFps": 24,
+  "shutter": { "mode": "angle", "shutterAngleDegrees": 180 },
+  "isoMin": 100,
+  "isoMax": 3200,
+  "whiteBalanceKelvin": 5600,
+  "tint": 0,
+  "focusMode": "continuous_locked_on_start",
+  "codec": "hevc",
+  "bitrateBps": 100000000,
+  "bitDepth": 8,
+  "colorProfile": "flat_approximation",
+  "lutId": "rec709_neutral_monitor",
+  "stabilization": "eis",
+  "audioSource": "internal_mic",
+  "storageTarget": "internal",
+  "thermalProfileId": "balanced_field",
+  "monitoringOverlays": ["histogram", "frame_guides"],
+  "buttonMappingId": "default"
+}

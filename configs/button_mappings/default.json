@@ -1,0 +1,16 @@
+{
+  "id": "default",
+  "mappings": [
+    { "input": "volume_up_short", "action": "record_toggle" },
+    { "input": "volume_down_short", "action": "still_capture" },
+    { "input": "volume_up_long", "action": "profile_cycle" },
+    { "input": "volume_down_long", "action": "focus_assist_toggle" },
+    { "input": "double_tap_preview", "action": "overlay_toggle" },
+    { "input": "two_finger_tap", "action": "screen_lock" },
+    { "input": "three_finger_tap", "action": "emergency_stop" },
+    { "input": "power_short_while_recording", "action": "lock_screen_only" },
+    { "input": "power_long", "action": "system_power_menu_with_warning" },
+    { "input": "hid_key_r", "action": "record_toggle" },
+    { "input": "hid_key_space", "action": "still_capture" }
+  ]
+}

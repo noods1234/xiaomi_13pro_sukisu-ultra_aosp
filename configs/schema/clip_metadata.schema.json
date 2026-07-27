@@ -1,0 +1,228 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OIW-ROM Clip Metadata Sidecar",
+  "description": "Mirrors com.oiw.camera.metadata.MetadataWriter.ClipMetadata. See docs/STORAGE_MEDIA.md #7 and root brief #8.7.",
+  "type": "object",
+  "required": [
+    "project",
+    "dateTimeIso8601",
+    "deviceModel",
+    "cameraId",
+    "resolution",
+    "frameRateFps",
+    "codec",
+    "bitrateBps",
+    "storageMedium"
+  ],
+  "properties": {
+    "project": {
+      "type": "string"
+    },
+    "scene": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "shot": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "take": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "circledTake": {
+      "type": "boolean",
+      "description": "Script supervisor's circled take \u2014 the keeper. Set from the in-app slate."
+    },
+    "dateTimeIso8601": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deviceModel": {
+      "type": "string"
+    },
+    "romBuild": {
+      "type": "string"
+    },
+    "kernelBuild": {
+      "type": "string"
+    },
+    "cameraId": {
+      "type": "string"
+    },
+    "sensorMode": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "resolution": {
+      "type": "string"
+    },
+    "frameRateFps": {
+      "type": "integer"
+    },
+    "shutter": {
+      "type": "string"
+    },
+    "isoSensitivity": {
+      "type": "integer"
+    },
+    "whiteBalanceKelvin": {
+      "type": "integer"
+    },
+    "tint": {
+      "type": "integer"
+    },
+    "focusDistance": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "stabilizationMode": {
+      "type": "string"
+    },
+    "codec": {
+      "type": "string"
+    },
+    "bitrateBps": {
+      "type": "integer"
+    },
+    "colorProfile": {
+      "type": "string"
+    },
+    "lutId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "lutBaked": {
+      "type": "boolean"
+    },
+    "storageMedium": {
+      "type": "string"
+    },
+    "measuredWriteSpeedMbps": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "droppedFrames": {
+      "type": "integer"
+    },
+    "thermalStateAtStop": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "batteryPercentAtStop": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "lensName": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "focalLengthMm": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "aperture": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "adapter": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "filterStack": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "ndValue": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "anamorphicSqueeze": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "gpsLocation": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "notes": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "recovered": {
+      "type": "boolean"
+    },
+    "recoveryNotes": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "integritySha256": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "avSyncOffsetNanos": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "slateMarkers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "type",
+          "timestampNanos"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "timestampNanos": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

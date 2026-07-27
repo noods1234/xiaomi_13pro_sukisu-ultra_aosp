@@ -1,0 +1,23 @@
+{
+  "id": "cinema_ir_false_color",
+  "displayName": "Cinema IR/Full-Spectrum (hardware-modified units only)",
+  "resolution": { "width": 3840, "height": 2160 },
+  "frameRateFps": 24,
+  "shutter": { "mode": "angle", "shutterAngleDegrees": 180 },
+  "isoMin": 200,
+  "isoMax": 3200,
+  "whiteBalanceKelvin": 2800,
+  "tint": 15,
+  "focusMode": "manual",
+  "codec": "hevc",
+  "bitrateBps": 100000000,
+  "bitDepth": 8,
+  "colorProfile": "standard",
+  "lutId": null,
+  "stabilization": "off",
+  "audioSource": "internal_mic",
+  "storageTarget": "internal",
+  "thermalProfileId": "balanced_field",
+  "monitoringOverlays": ["false_color", "histogram"],
+  "buttonMappingId": "default"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "cinema_1080p_60_slowmo",
+  "displayName": "Cinema 1080p 60fps (2.5x @ 24)",
+  "resolution": { "width": 1920, "height": 1080 },
+  "frameRateFps": 60,
+  "shutter": { "mode": "angle", "shutterAngleDegrees": 180 },
+  "isoMin": 100,
+  "isoMax": 1600,
+  "whiteBalanceKelvin": 5600,
+  "tint": 0,
+  "focusMode": "manual",
+  "codec": "hevc",
+  "bitrateBps": 100000000,
+  "bitDepth": 8,
+  "colorProfile": "standard",
+  "lutId": null,
+  "stabilization": "off",
+  "audioSource": "internal_mic",
+  "storageTarget": "internal",
+  "thermalProfileId": "balanced_field",
+  "monitoringOverlays": ["histogram", "frame_guides"],
+  "buttonMappingId": "default"
+}

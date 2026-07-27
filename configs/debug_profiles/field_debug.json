@@ -1,0 +1,9 @@
+{
+  "id": "field_debug",
+  "displayName": "Field Debug",
+  "loggingLevel": "verbose",
+  "debugPanelUnlocked": true,
+  "showRawCaptureResultEcho": true,
+  "showVendorTagDump": true,
+  "keepLogsDays": 7
+}

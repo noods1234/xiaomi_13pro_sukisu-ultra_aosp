@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <TextureView
+        android:id="@+id/preview_texture_view"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottom_bar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Overlay surface for histogram/zebra/focus-peaking/LUT-preview compositing (docs/UI_UX.md #4). -->
+    <FrameLayout
+        android:id="@+id/overlay_container"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="@id/preview_texture_view"
+        app:layout_constraintBottom_toBottomOf="@id/preview_texture_view"
+        app:layout_constraintStart_toStartOf="@id/preview_texture_view"
+        app:layout_constraintEnd_toEndOf="@id/preview_texture_view" />
+
+    <TextView
+        android:id="@+id/status_bar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="#80000000"
+        android:textColor="#FFFFFF"
+        android:padding="8dp"
+        android:text="@string/status_bar_placeholder"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <LinearLayout
+        android:id="@+id/bottom_bar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#80000000"
+        android:padding="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <Button
+            android:id="@+id/record_button"
+            android:layout_width="wrap_content"
+            android:layout_height="64dp"
+            android:minWidth="64dp"
+            android:text="@string/record_button" />
+
+        <Button
+            android:id="@+id/still_button"
+            android:layout_width="wrap_content"
+            android:layout_height="64dp"
+            android:minWidth="64dp"
+            android:text="@string/still_button" />
+
+        <Button
+            android:id="@+id/slate_button"
+            android:layout_width="wrap_content"
+            android:layout_height="64dp"
+            android:text="@string/slate_button" />
+
+        <Button
+            android:id="@+id/profile_button"
+            android:layout_width="wrap_content"
+            android:layout_height="64dp"
+            android:minWidth="64dp"
+            android:text="@string/profile_button" />
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

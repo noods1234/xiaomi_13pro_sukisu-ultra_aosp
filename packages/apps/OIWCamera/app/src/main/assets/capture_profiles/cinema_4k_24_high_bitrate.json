@@ -1,0 +1,23 @@
+{
+  "id": "cinema_4k_24_high_bitrate",
+  "displayName": "Cinema 4K 24p High Bitrate",
+  "resolution": { "width": 3840, "height": 2160 },
+  "frameRateFps": 24,
+  "shutter": { "mode": "angle", "shutterAngleDegrees": 180 },
+  "isoMin": 100,
+  "isoMax": 3200,
+  "whiteBalanceKelvin": 5600,
+  "tint": 0,
+  "focusMode": "manual",
+  "codec": "hevc10",
+  "bitrateBps": 240000000,
+  "bitDepth": 10,
+  "colorProfile": "flat_approximation",
+  "lutId": null,
+  "stabilization": "off",
+  "audioSource": "internal_mic",
+  "storageTarget": "external_ssd",
+  "thermalProfileId": "max_quality_short_take",
+  "monitoringOverlays": ["histogram", "zebra", "focus_peaking", "frame_guides"],
+  "buttonMappingId": "default"
+}

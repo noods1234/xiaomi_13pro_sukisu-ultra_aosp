@@ -1,0 +1,20 @@
+{
+  "luts": [
+    {
+      "id": "rec709_neutral_monitor",
+      "displayName": "Rec.709 Neutral Monitor",
+      "path": "rec709_neutral_monitor.cube",
+      "size": 17,
+      "intendedUse": "technical",
+      "sourceNotes": "Identity-adjacent monitor LUT for viewing the flat_approximation color profile with a plausible Rec.709-ish contrast/gamma for on-set judgment. Not a calibrated display transform."
+    },
+    {
+      "id": "desqueeze_neutral",
+      "displayName": "Desqueeze Neutral (no color change)",
+      "path": "desqueeze_neutral.cube",
+      "size": 17,
+      "intendedUse": "desqueeze_neutral",
+      "sourceNotes": "Identity color LUT — paired with the geometric anamorphic desqueeze preview toggle, contributes no color shift on its own."
+    }
+  ]
+}

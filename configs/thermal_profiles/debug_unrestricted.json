@@ -1,0 +1,12 @@
+{
+  "id": "debug_unrestricted",
+  "displayName": "Debug Unrestricted",
+  "warningThermalStatus": "EMERGENCY",
+  "forcedStopThermalStatus": "EMERGENCY",
+  "displayBrightnessCapPercent": 100,
+  "backgroundServicesForegroundOnly": false,
+  "radiosForcedOff": [],
+  "chargingWarning": false,
+  "loggingLevel": "verbose_plus_raw_sysfs",
+  "notes": "No app-level caps at all. Relies entirely on the OS's own thermal self-protection (THERMAL_STATUS_SHUTDOWN). Debug/development use only, never a field-shooting default."
+}

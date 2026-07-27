@@ -1,0 +1,23 @@
+{
+  "id": "cinema_long_take_safe",
+  "displayName": "Cinema Long Take Safe",
+  "resolution": { "width": 1920, "height": 1080 },
+  "frameRateFps": 24,
+  "shutter": { "mode": "angle", "shutterAngleDegrees": 180 },
+  "isoMin": 100,
+  "isoMax": 3200,
+  "whiteBalanceKelvin": 5600,
+  "tint": 0,
+  "focusMode": "manual",
+  "codec": "avc",
+  "bitrateBps": 40000000,
+  "bitDepth": 8,
+  "colorProfile": "flat_approximation",
+  "lutId": "rec709_neutral_monitor",
+  "stabilization": "off",
+  "audioSource": "internal_mic",
+  "storageTarget": "internal",
+  "thermalProfileId": "long_take_safe",
+  "monitoringOverlays": ["histogram", "frame_guides"],
+  "buttonMappingId": "default"
+}
